@@ -24,6 +24,8 @@
 html {
     background: var(--background);
     color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
 }
 
 
@@ -51,19 +53,32 @@ body {
         0
         env(safe-area-inset-bottom);
     overflow-x: hidden;
+    touch-action: manipulation;
 }
 
 
 button,
 label,
-input {
+input,
+select,
+textarea {
     font: inherit;
 }
 
 
 button,
-label {
+label,
+a {
     -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+
+input,
+button,
+select,
+textarea {
+    font-size: 16px;
 }
 
 
@@ -93,40 +108,63 @@ button {
    ========================================================= */
 
 .app-header {
-    margin-bottom: 34px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    margin-top: 45px;
+    margin-bottom: 50px;
 }
 
 
 .brand {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 14px;
+    justify-content: center;
+
+    text-align: center;
 }
 
 
 .brand-icon {
-    width: 52px;
-    height: 52px;
+    width: 76px;
+    height: 76px;
+    min-width: 76px;
+
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 16px;
+
+    border-radius: 22px;
+
     background:
         linear-gradient(
             145deg,
             #0a84ff,
             #0071e3
         );
+
     color: #ffffff;
-    font-size: 16px;
+
+    font-size: 22px;
     font-weight: 800;
+
     box-shadow:
         0 8px 30px
         rgba(10, 132, 255, 0.25);
+
+    transition:
+        transform 0.25s ease,
+        opacity 0.25s ease,
+        background 0.25s ease,
+        box-shadow 0.25s ease;
 }
 
 
 .brand h1 {
+    margin-top: 14px;
+
     font-size: 27px;
     line-height: 1.1;
     font-weight: 700;
@@ -882,8 +920,156 @@ button {
 
 
 /* =========================================================
-   LOGO AL ACTIVARSE
+   RESPONSIVE
    ========================================================= */
+
+@media (max-width: 520px) {
+
+    .app {
+        padding:
+            24px
+            16px
+            40px;
+    }
+
+
+    .app-header {
+        margin-top: 45px;
+        margin-bottom: 50px;
+    }
+
+
+    .brand-icon {
+        width: 76px;
+        height: 76px;
+        min-width: 76px;
+        border-radius: 22px;
+        font-size: 22px;
+    }
+
+
+    .brand h1 {
+        font-size: 24px;
+    }
+
+
+    .empty-state {
+        min-height: 60vh;
+    }
+
+
+    .empty-state h2 {
+        font-size: 25px;
+    }
+
+
+    .summary-card {
+        padding: 20px 14px;
+    }
+
+
+    .summary-column strong {
+        font-size: 21px;
+    }
+
+
+    .section-card {
+        padding: 18px;
+    }
+
+
+    .photo-grid {
+        grid-template-columns:
+            repeat(
+                3,
+                minmax(0, 1fr)
+            );
+    }
+
+
+    .quality-card {
+        min-height: 72px;
+        padding: 14px;
+    }
+
+
+    .quality-content strong {
+        font-size: 15px;
+    }
+
+
+    .quality-content small {
+        font-size: 12px;
+    }
+
+
+    .target-options {
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(0, 1fr)
+            );
+    }
+
+
+    .target-option {
+        min-height: 68px;
+        font-size: 20px;
+    }
+
+
+    .option-card {
+        min-height: 68px;
+        padding: 14px;
+    }
+
+
+    .option-content strong {
+        font-size: 15px;
+    }
+
+
+    .option-content small {
+        font-size: 12px;
+    }
+
+}
+
+
+/* =========================================================
+   IPHONE
+   ========================================================= */
+
+@media (max-width: 430px) {
+
+    .target-options {
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(0, 1fr)
+            );
+    }
+
+
+    .target-option {
+        border-radius: 17px;
+    }
+
+}
+
+
+/* =========================================================
+   EASTER EGG - LOGO
+   ========================================================= */
+
+#easterEggLogo,
+.brand-icon {
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
 
 .brand-icon.easter-active {
     transform:
@@ -917,7 +1103,7 @@ button {
 
 
 /* =========================================================
-   MENSAJE EASTER EGG
+   EASTER EGG - MENSAJE
    ========================================================= */
 
 .easter-egg-message {
@@ -1057,138 +1243,36 @@ button {
 
 
 /* =========================================================
-   RESPONSIVE
-   ========================================================= */
-
-@media (max-width: 520px) {
-
-    .app {
-        padding:
-            24px
-            16px
-            40px;
-    }
-
-
-    .brand-icon {
-        width: 48px;
-        height: 48px;
-        border-radius: 14px;
-    }
-
-
-    .brand h1 {
-        font-size: 24px;
-    }
-
-
-    .empty-state {
-        min-height: 60vh;
-    }
-
-
-    .empty-state h2 {
-        font-size: 25px;
-    }
-
-
-    .summary-card {
-        padding: 20px 14px;
-    }
-
-
-    .summary-column strong {
-        font-size: 21px;
-    }
-
-
-    .section-card {
-        padding: 18px;
-    }
-
-
-    .photo-grid {
-        grid-template-columns:
-            repeat(
-                3,
-                minmax(0, 1fr)
-            );
-    }
-
-
-    .quality-card {
-        min-height: 72px;
-        padding: 14px;
-    }
-
-
-    .quality-content strong {
-        font-size: 15px;
-    }
-
-
-    .quality-content small {
-        font-size: 12px;
-    }
-
-
-    .target-options {
-        grid-template-columns:
-            repeat(
-                2,
-                minmax(0, 1fr)
-            );
-    }
-
-
-    .target-option {
-        min-height: 68px;
-        font-size: 20px;
-    }
-
-
-    .option-card {
-        min-height: 68px;
-        padding: 14px;
-    }
-
-
-    .option-content strong {
-        font-size: 15px;
-    }
-
-
-    .option-content small {
-        font-size: 12px;
-    }
-
-}
-
-
-/* =========================================================
-   IPHONE
+   IPHONE - CABECERA
    ========================================================= */
 
 @media (max-width: 430px) {
 
-    .target-options {
-        grid-template-columns:
-            repeat(
-                2,
-                minmax(0, 1fr)
-            );
+    .app-header {
+        margin-top: 45px;
+        margin-bottom: 50px;
     }
 
 
-    .target-option {
-        border-radius: 17px;
+    .brand-icon {
+        width: 76px;
+        height: 76px;
+        min-width: 76px;
+        border-radius: 22px;
+        font-size: 22px;
+    }
+
+
+    .brand h1 {
+        margin-top: 14px;
+        font-size: 24px;
     }
 
 }
 
 
 /* =========================================================
-   IPHONE / SAFARI - EVITAR ZOOM
+   IPHONE / SAFARI - EVITAR ZOOM AUTOMÁTICO
    ========================================================= */
 
 html {
@@ -1196,9 +1280,11 @@ html {
     text-size-adjust: 100%;
 }
 
+
 body {
     touch-action: manipulation;
 }
+
 
 input,
 button,
@@ -1206,6 +1292,7 @@ select,
 textarea {
     font-size: 16px;
 }
+
 
 button,
 label,
