@@ -2365,61 +2365,57 @@ initializeQualitySelection();
 (function initializeEasterEgg() {
 
     const brandIcon =
-        document.querySelector(".brand-icon");
+        document.querySelector(
+            ".brand-icon"
+        );
 
-    if (!brandIcon) {
+    if (
+        !brandIcon
+    ) {
+
         return;
+
     }
 
-    let taps = 0;
-    let resetTimer = null;
+    let taps =
+        0;
 
-    const message =
-        document.createElement("div");
+    let resetTimer =
+        null;
 
-    message.textContent =
-        "Hecho especialmente para ti ❤️";
+    let originalText =
+        brandIcon.textContent;
 
-    Object.assign(
-        message.style,
-        {
-            position: "fixed",
-            left: "50%",
-            bottom: "32px",
-            transform: "translate(-50%, 20px)",
-            padding: "14px 20px",
-            borderRadius: "999px",
-            background: "rgba(28, 28, 30, 0.96)",
-            color: "#ffffff",
-            fontSize: "15px",
-            fontWeight: "600",
-            textAlign: "center",
-            boxShadow: "0 10px 35px rgba(0, 0, 0, 0.30)",
-            opacity: "0",
-            pointerEvents: "none",
-            transition:
-                "opacity 0.25s ease, transform 0.25s ease",
-            zIndex: "9999",
-            whiteSpace: "nowrap"
-        }
-    );
 
-    document.body.appendChild(message);
+    function activateEasterEgg() {
 
-    function showMessage() {
+        taps =
+            0;
 
-        message.style.opacity = "1";
+        clearTimeout(
+            resetTimer
+        );
 
-        message.style.transform =
-            "translate(-50%, 0)";
+
+        brandIcon.classList.add(
+            "easter-active"
+        );
+
+
+        brandIcon.textContent =
+            "♥";
+
 
         window.setTimeout(
             () => {
 
-                message.style.opacity = "0";
+                brandIcon.classList.remove(
+                    "easter-active"
+                );
 
-                message.style.transform =
-                    "translate(-50%, 20px)";
+
+                brandIcon.textContent =
+                    originalText;
 
             },
             3000
@@ -2427,29 +2423,37 @@ initializeQualitySelection();
 
     }
 
+
     brandIcon.addEventListener(
         "click",
         () => {
 
             taps++;
 
-            clearTimeout(resetTimer);
 
-            if (taps >= 5) {
+            clearTimeout(
+                resetTimer
+            );
 
-                taps = 0;
 
-                showMessage();
+            if (
+                taps >=
+                5
+            ) {
+
+                activateEasterEgg();
 
                 return;
 
             }
 
+
             resetTimer =
-                setTimeout(
+                window.setTimeout(
                     () => {
 
-                        taps = 0;
+                        taps =
+                            0;
 
                     },
                     1200

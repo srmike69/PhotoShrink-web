@@ -881,78 +881,40 @@ button {
 }
 
 
-/* =========================================================
-   EASTER EGG
+//* =========================================================
+   EASTER EGG - LOGO
    ========================================================= */
 
-#easterEggLogo {
-    cursor: pointer;
-    user-select: none;
-    -webkit-user-select: none;
-    -webkit-tap-highlight-color: transparent;
-}
-
-
-.easter-egg-message {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    z-index: 9999;
-    width: max-content;
-    max-width: calc(100vw - 40px);
-    padding: 22px 28px;
+.brand-icon {
+    width: 76px;
+    height: 76px;
+    min-width: 76px;
     border-radius: 22px;
-    background:
-        rgba(28, 28, 30, 0.96);
-    border:
-        1px solid
-        rgba(255, 255, 255, 0.10);
-    box-shadow:
-        0 20px 60px
-        rgba(0, 0, 0, 0.45);
-    text-align: center;
-    opacity: 0;
-    transform:
-        translate(-50%, -50%)
-        scale(0.92);
-    pointer-events: none;
+    font-size: 22px;
+
     transition:
-        opacity 0.35s ease,
-        transform 0.35s ease;
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+        transform 0.25s ease,
+        opacity 0.25s ease;
 }
 
 
-.easter-egg-message.show {
-    opacity: 1;
+.app-header {
+    display: flex;
+    justify-content: center;
+}
+
+
+.brand {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+
+.brand-icon.easter-active {
     transform:
-        translate(-50%, -50%)
-        scale(1);
-}
-
-
-.easter-egg-letter {
-    margin-bottom: 10px;
-    color: var(--blue);
-    font-size: 32px;
-    line-height: 1;
-    font-weight: 700;
-}
-
-
-.easter-egg-message p {
-    color: var(--text);
-    font-size: 16px;
-    line-height: 1.4;
-}
-
-
-.easter-egg-heart {
-    margin-top: 8px;
-    color: #ff375f;
-    font-size: 20px;
-    line-height: 1;
+        scale(1.12)
+        rotate(5deg);
 }
 
 
