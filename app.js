@@ -2355,3 +2355,107 @@ if (
    ========================================================= */
 
 initializeQualitySelection();
+
+
+
+/* =========================================================
+   EASTER EGG
+   ========================================================= */
+
+(function initializeEasterEgg() {
+
+    const brandIcon =
+        document.querySelector(".brand-icon");
+
+    if (!brandIcon) {
+        return;
+    }
+
+    let taps = 0;
+    let resetTimer = null;
+
+    const message =
+        document.createElement("div");
+
+    message.textContent =
+        "Hecho especialmente para ti ❤️";
+
+    Object.assign(
+        message.style,
+        {
+            position: "fixed",
+            left: "50%",
+            bottom: "32px",
+            transform: "translate(-50%, 20px)",
+            padding: "14px 20px",
+            borderRadius: "999px",
+            background: "rgba(28, 28, 30, 0.96)",
+            color: "#ffffff",
+            fontSize: "15px",
+            fontWeight: "600",
+            textAlign: "center",
+            boxShadow: "0 10px 35px rgba(0, 0, 0, 0.30)",
+            opacity: "0",
+            pointerEvents: "none",
+            transition:
+                "opacity 0.25s ease, transform 0.25s ease",
+            zIndex: "9999",
+            whiteSpace: "nowrap"
+        }
+    );
+
+    document.body.appendChild(message);
+
+    function showMessage() {
+
+        message.style.opacity = "1";
+
+        message.style.transform =
+            "translate(-50%, 0)";
+
+        window.setTimeout(
+            () => {
+
+                message.style.opacity = "0";
+
+                message.style.transform =
+                    "translate(-50%, 20px)";
+
+            },
+            3000
+        );
+
+    }
+
+    brandIcon.addEventListener(
+        "click",
+        () => {
+
+            taps++;
+
+            clearTimeout(resetTimer);
+
+            if (taps >= 5) {
+
+                taps = 0;
+
+                showMessage();
+
+                return;
+
+            }
+
+            resetTimer =
+                setTimeout(
+                    () => {
+
+                        taps = 0;
+
+                    },
+                    1200
+                );
+
+        }
+    );
+
+})();
