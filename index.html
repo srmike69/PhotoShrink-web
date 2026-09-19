@@ -33,7 +33,10 @@
         content="Comprime tus fotos directamente en tu dispositivo."
     >
 
-    <link rel="manifest" href="manifest.json">
+    <link
+        rel="manifest"
+        href="manifest.json"
+    >
 
     <link
         rel="apple-touch-icon"
@@ -63,11 +66,15 @@
                 </div>
 
                 <div>
-                    <h1>PhotoShrink</h1>
+
+                    <h1>
+                        PhotoShrink
+                    </h1>
 
                     <p>
                         Misma calidad. Menos peso.
                     </p>
+
                 </div>
 
             </div>
@@ -111,13 +118,16 @@
 
             </div>
 
+
             <h2>
                 Selecciona tus fotos
             </h2>
 
+
             <p>
                 Elige todas las fotos que quieras comprimir.
             </p>
+
 
             <label
                 for="photoInput"
@@ -132,6 +142,7 @@
 
             </label>
 
+
             <input
                 id="photoInput"
                 type="file"
@@ -139,6 +150,7 @@
                 multiple
                 hidden
             >
+
 
             <p class="privacy-text">
                 Las fotos se procesan únicamente en tu dispositivo.
@@ -153,6 +165,7 @@
             id="workspace"
             class="workspace hidden"
         >
+
 
             <!-- RESUMEN -->
 
@@ -217,6 +230,7 @@
                         </p>
 
                     </div>
+
 
                     <button
                         id="changeSelection"
@@ -384,6 +398,7 @@
 
                     <div class="target-divider"></div>
 
+
                     <h3>
                         Tamaño máximo por foto
                     </h3>
@@ -399,6 +414,7 @@
                             1 MB
                         </button>
 
+
                         <button
                             type="button"
                             class="target-option"
@@ -407,6 +423,7 @@
                             2 MB
                         </button>
 
+
                         <button
                             type="button"
                             class="target-option"
@@ -414,6 +431,7 @@
                         >
                             5 MB
                         </button>
+
 
                         <button
                             type="button"
@@ -493,6 +511,7 @@
 
                 </div>
 
+
                 <div class="progress-track">
 
                     <div
@@ -516,20 +535,23 @@
                     ✓
                 </div>
 
+
                 <h2>
                     Compresión completada
                 </h2>
 
+
                 <p id="resultText">
                     Tus fotos están listas.
                 </p>
+
 
                 <button
                     id="saveButton"
                     class="primary-button"
                     type="button"
                 >
-                    Guardar fotos
+                    Guardar en Fotos
                 </button>
 
             </section>
