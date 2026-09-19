@@ -232,13 +232,26 @@
                     </div>
 
 
-                    <button
-                        id="changeSelection"
-                        class="text-button"
-                        type="button"
-                    >
-                        Cambiar
-                    </button>
+                    <div class="selection-actions">
+
+                        <button
+                            id="changeSelection"
+                            class="text-button"
+                            type="button"
+                        >
+                            Cambiar
+                        </button>
+
+
+                        <button
+                            id="clearSelection"
+                            class="text-button"
+                            type="button"
+                        >
+                            Quitar selección
+                        </button>
+
+                    </div>
 
                 </div>
 
@@ -477,6 +490,94 @@
                     </p>
 
                 </div>
+
+            </section>
+
+
+            <!-- OPCIONES -->
+
+            <section class="section-card">
+
+                <div class="section-header">
+
+                    <div>
+
+                        <h2>
+                            Opciones
+                        </h2>
+
+                        <p>
+                            Elige qué quieres conservar en tus fotos.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="option-list">
+
+
+                    <!-- CONSERVAR METADATOS -->
+
+                    <label class="option-card">
+
+                        <input
+                            id="preserveMetadata"
+                            type="checkbox"
+                            checked
+                        >
+
+                        <span class="option-switch"></span>
+
+                        <span class="option-content">
+
+                            <strong>
+                                Conservar metadatos
+                            </strong>
+
+                            <small>
+                                Mantiene los metadatos originales cuando el formato lo permite.
+                            </small>
+
+                        </span>
+
+                    </label>
+
+
+                    <!-- MANTENER FORMATO -->
+
+                    <label class="option-card">
+
+                        <input
+                            id="preserveFormat"
+                            type="checkbox"
+                            checked
+                        >
+
+                        <span class="option-switch"></span>
+
+                        <span class="option-content">
+
+                            <strong>
+                                Mantener formato original
+                            </strong>
+
+                            <small>
+                                Mantiene JPG, PNG y WebP siempre que sea posible.
+                            </small>
+
+                        </span>
+
+                    </label>
+
+                </div>
+
+
+                <p class="option-note">
+                    Si una imagen utiliza un formato que el navegador no puede volver a comprimir,
+                    se conservará el archivo original cuando esta opción esté activada.
+                </p>
 
             </section>
 
