@@ -1,13 +1,19 @@
-const CACHE_NAME = "photoshrink-v1";
+const CACHE_NAME = "photoshrink-v2";
 
-const FILES_TO_CACHE = [
-    "./",
-    "./index.html",
+const STATIC_FILES = [
     "./styles.css",
     "./app.js",
-    "./manifest.json"
+    "./manifest.json",
+    "./icons/icon-192.png",
+    "./icons/icon-512.png",
+    "./icons/icon-512-maskable.png",
+    "./icons/apple-touch-icon.png"
 ];
 
+
+/* =========================================================
+   INSTALL
+   ========================================================= */
 
 self.addEventListener(
     "install",
@@ -19,7 +25,7 @@ self.addEventListener(
                 .then(
                     cache =>
                         cache.addAll(
-                            FILES_TO_CACHE
+                            STATIC_FILES
                         )
                 )
         );
@@ -29,6 +35,10 @@ self.addEventListener(
     }
 );
 
+
+/* =========================================================
+   ACTIVATE
+   ========================================================= */
 
 self.addEventListener(
     "activate",
@@ -44,36 +54,73 @@ self.addEventListener(
                             keys
                                 .filter(
                                     key =>
-                                        key !==
-                                        CACHE_NAME
+                                        key !== CACHE_NAME
                                 )
                                 .map(
                                     key =>
-                                        caches.delete(
-                                            key
-                                        )
+                                        caches.delete(key)
                                 )
                         )
                 )
+                .then(
+                    () =>
+                        self.clients.claim()
+                )
 
         );
-
-        self.clients.claim();
 
     }
 );
 
 
+/* =========================================================
+   FETCH
+   ========================================================= */
+
 self.addEventListener(
     "fetch",
     event => {
 
+        const request =
+            event.request;
+
+
+        /*
+         * Para navegaciones HTML NO devolvemos
+         * una respuesta cacheada.
+         *
+         * Safari iOS puede rechazar respuestas
+         * cacheadas que originalmente pasaron
+         * por una redirección.
+         */
+
+        if (
+            request.mode === "navigate"
+        ) {
+
+            event.respondWith(
+                fetch(request).catch(
+                    () =>
+                        caches.match(
+                            "./index.html"
+                        )
+                )
+            );
+
+            return;
+
+        }
+
+
+        /*
+         * Para CSS, JS, manifest e iconos:
+         * caché primero, red después.
+         */
+
         event.respondWith(
 
             caches
-                .match(
-                    event.request
-                )
+                .match(request)
                 .then(
                     cachedResponse => {
 
@@ -86,9 +133,48 @@ self.addEventListener(
                         }
 
 
-                        return fetch(
-                            event.request
-                        );
+                        return fetch(request)
+                            .then(
+                                response => {
+
+                                    /*
+                                     * No almacenamos respuestas
+                                     * redirigidas.
+                                     */
+
+                                    if (
+                                        !response ||
+                                        response.status !== 200 ||
+                                        response.redirected
+                                    ) {
+
+                                        return response;
+
+                                    }
+
+
+                                    const responseClone =
+                                        response.clone();
+
+
+                                    caches
+                                        .open(CACHE_NAME)
+                                        .then(
+                                            cache => {
+
+                                                cache.put(
+                                                    request,
+                                                    responseClone
+                                                );
+
+                                            }
+                                        );
+
+
+                                    return response;
+
+                                }
+                            );
 
                     }
                 )

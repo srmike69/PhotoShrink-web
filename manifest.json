@@ -2,7 +2,7 @@
   "name": "PhotoShrink",
   "short_name": "PhotoShrink",
   "description": "Comprime tus fotos directamente en tu dispositivo.",
-  "start_url": "./index.html",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
