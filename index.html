@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    >
+
+    <meta
+        name="theme-color"
+        content="#000000"
+    >
+
+    <meta
+        name="apple-mobile-web-app-capable"
+        content="yes"
+    >
+
+    <meta
+        name="apple-mobile-web-app-status-bar-style"
+        content="black-translucent"
+    >
+
+    <meta
+        name="apple-mobile-web-app-title"
+        content="PhotoShrink"
+    >
+
+    <meta
+        name="description"
+        content="Comprime tus fotos directamente en tu dispositivo."
+    >
+
+    <link rel="manifest" href="manifest.json">
+
+    <link
+        rel="apple-touch-icon"
+        href="icons/apple-touch-icon.png"
+    >
+
+    <link
+        rel="stylesheet"
+        href="styles.css"
+    >
+
+    <title>PhotoShrink</title>
+</head>
+
+<body>
+
+    <main class="app">
+
+        <!-- CABECERA -->
+
+        <header class="app-header">
+
+            <div class="brand">
+
+                <div class="brand-icon">
+                    PS
+                </div>
+
+                <div>
+                    <h1>PhotoShrink</h1>
+
+                    <p>
+                        Misma calidad. Menos peso.
+                    </p>
+                </div>
+
+            </div>
+
+        </header>
+
+
+        <!-- ESTADO INICIAL -->
+
+        <section
+            id="emptyState"
+            class="empty-state"
+        >
+
+            <div class="empty-icon">
+
+                <svg
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                >
+
+                    <rect
+                        x="3"
+                        y="3"
+                        width="18"
+                        height="18"
+                        rx="4"
+                    />
+
+                    <circle
+                        cx="8.5"
+                        cy="8.5"
+                        r="1.5"
+                    />
+
+                    <path
+                        d="M4 18l5-5 3.5 3.5 2.5-3 5 5"
+                    />
+
+                </svg>
+
+            </div>
+
+            <h2>
+                Selecciona tus fotos
+            </h2>
+
+            <p>
+                Elige todas las fotos que quieras comprimir.
+            </p>
+
+            <label
+                for="photoInput"
+                class="primary-button"
+            >
+
+                <span class="button-icon">
+                    ＋
+                </span>
+
+                Seleccionar fotos
+
+            </label>
+
+            <input
+                id="photoInput"
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+            >
+
+            <p class="privacy-text">
+                Las fotos se procesan únicamente en tu dispositivo.
+            </p>
+
+        </section>
+
+
+        <!-- WORKSPACE -->
+
+        <section
+            id="workspace"
+            class="workspace hidden"
+        >
+
+            <!-- RESUMEN -->
+
+            <section class="summary-card">
+
+                <div class="summary-column">
+
+                    <span>
+                        Original
+                    </span>
+
+                    <strong id="originalSize">
+                        0 MB
+                    </strong>
+
+                    <small id="photoCount">
+                        0 fotos
+                    </small>
+
+                </div>
+
+
+                <div class="summary-divider"></div>
+
+
+                <div class="summary-column">
+
+                    <span>
+                        Después
+                    </span>
+
+                    <strong id="compressedSize">
+                        0 MB
+                    </strong>
+
+                    <div
+                        id="saving"
+                        class="saving"
+                    >
+                        Ahorro: 0 %
+                    </div>
+
+                </div>
+
+            </section>
+
+
+            <!-- FOTOS -->
+
+            <section class="section-card">
+
+                <div class="section-header">
+
+                    <div>
+
+                        <h2>
+                            Fotos seleccionadas
+                        </h2>
+
+                        <p id="selectionText">
+                            0 fotos seleccionadas
+                        </p>
+
+                    </div>
+
+                    <button
+                        id="changeSelection"
+                        class="text-button"
+                        type="button"
+                    >
+                        Cambiar
+                    </button>
+
+                </div>
+
+
+                <div
+                    id="photoGrid"
+                    class="photo-grid"
+                ></div>
+
+            </section>
+
+
+            <!-- COMPRESIÓN -->
+
+            <section class="section-card">
+
+                <div class="section-header">
+
+                    <div>
+
+                        <h2>
+                            Nivel de compresión
+                        </h2>
+
+                        <p>
+                            Elige cómo quieres reducir tus fotos.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="quality-options">
+
+
+                    <!-- MÁXIMA CALIDAD -->
+
+                    <label class="quality-card">
+
+                        <input
+                            type="radio"
+                            name="quality"
+                            value="maximum"
+                        >
+
+                        <span class="radio"></span>
+
+                        <span class="quality-content">
+
+                            <strong>
+                                Máxima calidad
+                            </strong>
+
+                            <small>
+                                Prioriza mantener la calidad original
+                            </small>
+
+                        </span>
+
+                    </label>
+
+
+                    <!-- EQUILIBRADO -->
+
+                    <label class="quality-card selected">
+
+                        <input
+                            type="radio"
+                            name="quality"
+                            value="balanced"
+                            checked
+                        >
+
+                        <span class="radio"></span>
+
+                        <span class="quality-content">
+
+                            <strong>
+                                Equilibrado
+                            </strong>
+
+                            <small>
+                                Buena calidad con mayor ahorro de espacio
+                            </small>
+
+                        </span>
+
+                    </label>
+
+
+                    <!-- MENOS 1 MB -->
+
+                    <label class="quality-card">
+
+                        <input
+                            type="radio"
+                            name="quality"
+                            value="minus1mb"
+                        >
+
+                        <span class="radio"></span>
+
+                        <span class="quality-content">
+
+                            <strong>
+                                -1 MB
+                            </strong>
+
+                            <small>
+                                Reduce aproximadamente 1 MB por foto
+                            </small>
+
+                        </span>
+
+                    </label>
+
+
+                    <!-- TAMAÑO OBJETIVO -->
+
+                    <label
+                        class="quality-card"
+                        id="targetQualityCard"
+                    >
+
+                        <input
+                            type="radio"
+                            name="quality"
+                            value="target"
+                        >
+
+                        <span class="radio"></span>
+
+                        <span class="quality-content">
+
+                            <strong>
+                                Tamaño objetivo
+                            </strong>
+
+                            <small>
+                                Elige cuánto quieres que pese cada foto
+                            </small>
+
+                        </span>
+
+                    </label>
+
+                </div>
+
+
+                <!-- TAMAÑO OBJETIVO -->
+
+                <div
+                    id="targetContainer"
+                    class="target-container hidden"
+                >
+
+                    <div class="target-divider"></div>
+
+                    <h3>
+                        Tamaño máximo por foto
+                    </h3>
+
+
+                    <div class="target-options">
+
+                        <button
+                            type="button"
+                            class="target-option active"
+                            data-size="1"
+                        >
+                            1 MB
+                        </button>
+
+                        <button
+                            type="button"
+                            class="target-option"
+                            data-size="2"
+                        >
+                            2 MB
+                        </button>
+
+                        <button
+                            type="button"
+                            class="target-option"
+                            data-size="5"
+                        >
+                            5 MB
+                        </button>
+
+                        <button
+                            type="button"
+                            class="target-option"
+                            data-size="custom"
+                        >
+                            Otro
+                        </button>
+
+                    </div>
+
+
+                    <div
+                        id="customTargetContainer"
+                        class="custom-target hidden"
+                    >
+
+                        <div class="custom-target-input">
+
+                            <input
+                                id="targetSize"
+                                type="number"
+                                min="0.1"
+                                step="0.1"
+                                value="1"
+                                inputmode="decimal"
+                            >
+
+                            <span>
+                                MB
+                            </span>
+
+                        </div>
+
+                    </div>
+
+
+                    <p
+                        id="targetDescription"
+                        class="target-description"
+                    >
+                        Cada foto intentará mantenerse por debajo de 1 MB.
+                    </p>
+
+                </div>
+
+            </section>
+
+
+            <!-- COMPRIMIR -->
+
+            <button
+                id="compressButton"
+                class="compress-button"
+                type="button"
+            >
+                Comprimir fotos
+            </button>
+
+
+            <!-- PROGRESO -->
+
+            <section
+                id="progressSection"
+                class="progress-card hidden"
+            >
+
+                <div class="progress-header">
+
+                    <span>
+                        Comprimiendo...
+                    </span>
+
+                    <span id="progressText">
+                        0 / 0
+                    </span>
+
+                </div>
+
+                <div class="progress-track">
+
+                    <div
+                        id="progressBar"
+                        class="progress-bar"
+                    ></div>
+
+                </div>
+
+            </section>
+
+
+            <!-- RESULTADO -->
+
+            <section
+                id="resultSection"
+                class="result-card hidden"
+            >
+
+                <div class="result-icon">
+                    ✓
+                </div>
+
+                <h2>
+                    Compresión completada
+                </h2>
+
+                <p id="resultText">
+                    Tus fotos están listas.
+                </p>
+
+                <button
+                    id="saveButton"
+                    class="primary-button"
+                    type="button"
+                >
+                    Guardar fotos
+                </button>
+
+            </section>
+
+
+            <button
+                id="bottomChangeSelection"
+                class="secondary-button"
+                type="button"
+            >
+                Cambiar selección
+            </button>
+
+
+            <p class="privacy-text bottom-privacy">
+
+                Las fotos se procesan únicamente en tu dispositivo.
+                No se suben a ningún servidor.
+
+            </p>
+
+        </section>
+
+    </main>
+
+
+    <script src="app.js"></script>
+
+</body>
+</html>
