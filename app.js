@@ -2377,25 +2377,65 @@ initializeQualitySelection();
 
     }
 
+
     let taps =
         0;
 
     let resetTimer =
         null;
 
-    let originalText =
+    const originalText =
         brandIcon.textContent;
 
+
+    /* =====================================================
+       MENSAJE
+       ===================================================== */
+
+    const message =
+        document.createElement(
+            "div"
+        );
+
+
+    message.className =
+        "easter-egg-message";
+
+
+    message.innerHTML = `
+        <div class="easter-egg-heart">
+            ♥
+        </div>
+
+        <div class="easter-egg-text">
+            Hecho especialmente para ti.
+        </div>
+    `;
+
+
+    document.body.appendChild(
+        message
+    );
+
+
+    /* =====================================================
+       ACTIVAR EASTER EGG
+       ===================================================== */
 
     function activateEasterEgg() {
 
         taps =
             0;
 
+
         clearTimeout(
             resetTimer
         );
 
+
+        /*
+         * Cambiar PS por M
+         */
 
         brandIcon.classList.add(
             "easter-active"
@@ -2403,8 +2443,38 @@ initializeQualitySelection();
 
 
         brandIcon.textContent =
-            "♥";
+            "M";
 
+
+        /*
+         * Mostrar mensaje
+         */
+
+        message.classList.add(
+            "show"
+        );
+
+
+        /*
+         * El mensaje dura 10 segundos
+         */
+
+        window.setTimeout(
+            () => {
+
+                message.classList.remove(
+                    "show"
+                );
+
+            },
+            10000
+        );
+
+
+        /*
+         * El icono vuelve a PS
+         * después de 20 segundos
+         */
 
         window.setTimeout(
             () => {
@@ -2418,11 +2488,15 @@ initializeQualitySelection();
                     originalText;
 
             },
-            3000
+            20000
         );
 
     }
 
+
+    /* =====================================================
+       DETECTAR 5 TOQUES
+       ===================================================== */
 
     brandIcon.addEventListener(
         "click",
