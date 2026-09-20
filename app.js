@@ -1568,8 +1568,11 @@ async function compressToTarget(
 
 
     /*
-     * Si la imagen original ya cumple el objetivo,
-     * no hacemos ninguna recompresión.
+     * Si la imagen original ya está por debajo
+     * del objetivo, no la recomprimimos.
+     *
+     * No tiene sentido degradar una foto que
+     * ya cumple el límite.
      */
 
     if (
@@ -1619,14 +1622,16 @@ async function compressToTarget(
 
 
     /*
-     * CALIDAD MÍNIMA ABSOLUTA
+     * =====================================================
+     * CALIDAD MÍNIMA
+     * =====================================================
      *
      * JPEG / WebP:
-     * 90 %
+     * nunca menos del 90 %.
      *
      * PNG:
-     * no utiliza este parámetro,
-     * por lo que siempre usamos 100 %.
+     * el parámetro de calidad no existe realmente,
+     * así que utilizamos 100 %.
      */
 
     const minimumQuality =
@@ -1638,7 +1643,7 @@ async function compressToTarget(
 
     /*
      * =====================================================
-     * GENERAR CANDIDATO
+     * CREAR CANDIDATO
      * =====================================================
      */
 
@@ -1704,7 +1709,7 @@ async function compressToTarget(
 
 
         /*
-         * Fondo blanco para JPEG.
+         * JPEG necesita un fondo sólido.
          */
 
         if (
@@ -1727,8 +1732,7 @@ async function compressToTarget(
 
 
         /*
-         * Dibujar la imagen a la resolución
-         * correspondiente.
+         * Dibujar la imagen.
          */
 
         context.drawImage(
@@ -1756,7 +1760,9 @@ async function compressToTarget(
 
 
         /*
-         * Los metadatos se añaden ANTES de comprobar
+         * MUY IMPORTANTE:
+         *
+         * Los metadatos se añaden antes de comprobar
          * el tamaño definitivo.
          */
 
@@ -1785,13 +1791,13 @@ async function compressToTarget(
 
             height,
 
+            scale,
+
             quality:
                 outputType ===
                     "image/png"
                     ? 1
-                    : quality,
-
-            scale
+                    : quality
 
         };
 
@@ -1803,20 +1809,47 @@ async function compressToTarget(
      * PNG
      * =====================================================
      *
-     * PNG no tiene control de calidad mediante
-     * canvas.toBlob().
+     * PNG no permite controlar la calidad como JPEG.
      *
-     * Por tanto:
-     *
-     * 100 % calidad
-     * +
-     * reducción de resolución.
+     * Por tanto, mantenemos la calidad al máximo y
+     * solamente reducimos resolución si hace falta.
      */
 
     if (
         outputType ===
         "image/png"
     ) {
+
+        /*
+         * Primero probamos resolución original.
+         */
+
+        const originalResolution =
+            await createCandidate(
+                1,
+                1
+            );
+
+
+        if (
+            originalResolution.blob.size <=
+            targetBytes
+        ) {
+
+            return createCompressedTargetFile(
+                originalResolution,
+                originalFile,
+                targetBytes,
+                outputType
+            );
+
+        }
+
+
+        /*
+         * Buscamos la mayor resolución posible
+         * utilizando búsqueda binaria.
+         */
 
         let lowScale =
             0.0001;
@@ -1831,8 +1864,8 @@ async function compressToTarget(
 
 
         /*
-         * Comprobamos que existe alguna resolución
-         * que pueda entrar en el objetivo.
+         * Comprobar primero que existe alguna
+         * resolución que pueda entrar.
          */
 
         const minimumCandidate =
@@ -1859,13 +1892,12 @@ async function compressToTarget(
 
 
         /*
-         * Búsqueda binaria para encontrar la
-         * MAYOR resolución posible.
+         * Búsqueda de la máxima resolución.
          */
 
         for (
             let attempt = 0;
-            attempt < 20;
+            attempt < 22;
             attempt++
         ) {
 
@@ -1906,10 +1938,6 @@ async function compressToTarget(
         }
 
 
-        /*
-         * Comprobación final.
-         */
-
         if (
             !best ||
             best.blob.size >
@@ -1938,21 +1966,27 @@ async function compressToTarget(
      * JPEG / WEBP
      * =====================================================
      *
-     * La calidad NUNCA baja de 90 %.
+     * PRIORIDAD:
      *
-     * Si 90 % no permite entrar en el objetivo,
-     * reducimos resolución.
+     * 1. Mantener resolución.
+     * 2. Mantener calidad.
+     * 3. No superar el objetivo.
+     *
+     * Nunca bajamos de 90 %.
      */
+
 
     /*
      * =====================================================
      * PASO 1
      *
-     * Intentar mantener la resolución original.
+     * Probar resolución original con 90 %.
+     *
+     * Si entra, no tocamos la resolución.
      * =====================================================
      */
 
-    const fullResolutionAt90 =
+    const fullResolutionMinimumQuality =
         await createCandidate(
             1,
             minimumQuality
@@ -1960,15 +1994,15 @@ async function compressToTarget(
 
 
     if (
-        fullResolutionAt90.blob.size <=
+        fullResolutionMinimumQuality.blob.size <=
         targetBytes
     ) {
 
         /*
-         * Ya entra al 90 %.
+         * La resolución original cabe.
          *
-         * Buscamos ahora la calidad máxima
-         * posible entre 90 y 100 %.
+         * Ahora buscamos la MAYOR calidad posible
+         * entre 90 % y 100 %.
          */
 
         let lowQuality =
@@ -1980,12 +2014,12 @@ async function compressToTarget(
 
 
         let best =
-            fullResolutionAt90;
+            fullResolutionMinimumQuality;
 
 
         for (
             let attempt = 0;
-            attempt < 18;
+            attempt < 20;
             attempt++
         ) {
 
@@ -2026,6 +2060,10 @@ async function compressToTarget(
         }
 
 
+        /*
+         * Resultado con resolución original.
+         */
+
         return createCompressedTargetFile(
             best,
             originalFile,
@@ -2043,9 +2081,9 @@ async function compressToTarget(
      * La resolución original no entra ni siquiera
      * al 90 %.
      *
-     * Ahora reducimos SOLO la resolución.
+     * Por tanto, tenemos que reducir resolución.
      *
-     * La calidad sigue siendo >= 90 %.
+     * Pero lo hacemos LO MÍNIMO POSIBLE.
      * =====================================================
      */
 
@@ -2062,11 +2100,11 @@ async function compressToTarget(
 
 
     /*
-     * Primero comprobamos que una resolución
-     * extremadamente pequeña pueda entrar.
+     * Comprobamos que una resolución extremadamente
+     * pequeña pueda entrar.
      */
 
-    const minimumScaleCandidate =
+    const minimumCandidate =
         await createCandidate(
             lowScale,
             minimumQuality
@@ -2074,7 +2112,7 @@ async function compressToTarget(
 
 
     if (
-        minimumScaleCandidate.blob.size >
+        minimumCandidate.blob.size >
         targetBytes
     ) {
 
@@ -2086,21 +2124,23 @@ async function compressToTarget(
 
 
     bestScaleCandidate =
-        minimumScaleCandidate;
+        minimumCandidate;
 
 
     /*
      * =====================================================
      * PASO 3
      *
-     * Buscar la MAYOR resolución posible manteniendo
-     * siempre como mínimo un 90 % de calidad.
+     * Encontrar la MAYOR resolución posible al 90 %.
+     *
+     * Esto es lo que evita que la foto quede
+     * innecesariamente borrosa.
      * =====================================================
      */
 
     for (
         let attempt = 0;
-        attempt < 22;
+        attempt < 24;
         attempt++
     ) {
 
@@ -2145,8 +2185,9 @@ async function compressToTarget(
      * =====================================================
      * PASO 4
      *
-     * Con la mayor resolución posible, buscamos
-     * la mayor calidad posible entre 90 y 100 %.
+     * Tenemos la máxima resolución que entra al 90 %.
+     *
+     * Ahora intentamos subir la calidad.
      * =====================================================
      */
 
@@ -2164,7 +2205,7 @@ async function compressToTarget(
 
     for (
         let attempt = 0;
-        attempt < 18;
+        attempt < 20;
         attempt++
     ) {
 
@@ -2209,10 +2250,13 @@ async function compressToTarget(
      * =====================================================
      * PASO 5
      *
-     * Búsqueda fina de resolución.
+     * BÚSQUEDA FINA DE RESOLUCIÓN
      *
-     * Esto permite aprovechar mejor los últimos KB
-     * disponibles sin sacrificar calidad.
+     * La búsqueda binaria nos ha dado una aproximación.
+     * Ahora buscamos un poco por encima para intentar
+     * aprovechar hasta el último píxel posible.
+     *
+     * Siempre manteniendo calidad >= 90 %.
      * =====================================================
      */
 
@@ -2220,152 +2264,126 @@ async function compressToTarget(
         bestScaleCandidate.scale;
 
 
-    const fineScales = [
+    /*
+     * Probamos incrementos muy pequeños.
+     *
+     * Ejemplo:
+     *
+     * 0.7340
+     * 0.7345
+     * 0.7350
+     * ...
+     */
 
-        baseScale,
+    const fineScales = [];
 
-        baseScale * 1.001,
 
-        baseScale * 1.002,
+    const fineStep =
+        0.0005;
 
-        baseScale * 1.005,
 
-        baseScale * 1.01,
+    const fineStart =
+        Math.max(
+            0.0001,
+            baseScale
+        );
 
-        baseScale * 1.02,
 
-        baseScale * 1.03
-
-    ]
-        .filter(
-            scale =>
-                scale > 0 &&
-                scale <= 1
+    const fineEnd =
+        Math.min(
+            1,
+            baseScale +
+            0.02
         );
 
 
     for (
-        const scale of
-        fineScales
+        let scale =
+            fineStart;
+        scale <=
+            fineEnd;
+        scale +=
+            fineStep
     ) {
 
-        /*
-         * Primero intentamos directamente
-         * con 100 %.
-         */
+        fineScales.push(
+            scale
+        );
 
-        const maximumQualityCandidate =
+    }
+
+
+    /*
+     * También incluimos exactamente la escala
+     * encontrada por la búsqueda binaria.
+     */
+
+    fineScales.push(
+        baseScale
+    );
+
+
+    /*
+     * Ordenamos y eliminamos duplicados.
+     */
+
+    const uniqueScales =
+        [
+            ...new Set(
+                fineScales.map(
+                    scale =>
+                        Number(
+                            scale.toFixed(
+                                6
+                            )
+                        )
+                )
+            )
+        ]
+            .sort(
+                (
+                    a,
+                    b
+                ) =>
+                    a - b
+            );
+
+
+    /*
+     * Buscamos primero la mayor resolución que
+     * pueda entrar al 90 %.
+     */
+
+    let bestFineScale =
+        bestScaleCandidate;
+
+
+    for (
+        const scale of
+        uniqueScales
+    ) {
+
+        const candidate =
             await createCandidate(
                 scale,
-                1
+                minimumQuality
             );
 
 
         if (
-            maximumQualityCandidate.blob.size <=
+            candidate.blob.size <=
             targetBytes
         ) {
 
-            /*
-             * Esta combinación es mejor porque
-             * mantiene la misma resolución pero
-             * mayor calidad.
-             */
-
             if (
-                maximumQualityCandidate.blob.size >
-                best.blob.size ||
-                maximumQualityCandidate.quality >
-                    best.quality
+                candidate.scale >
+                bestFineScale.scale
             ) {
 
-                best =
-                    maximumQualityCandidate;
-
-            }
-
-
-            continue;
-
-        }
-
-
-        /*
-         * Si 100 % no entra, buscamos entre
-         * 90 % y 100 %.
-         */
-
-        let localLow =
-            minimumQuality;
-
-
-        let localHigh =
-            1;
-
-
-        let localBest =
-            null;
-
-
-        for (
-            let attempt = 0;
-            attempt < 12;
-            attempt++
-        ) {
-
-            const quality =
-                (
-                    localLow +
-                    localHigh
-                ) /
-                2;
-
-
-            const candidate =
-                await createCandidate(
-                    scale,
-                    quality
-                );
-
-
-            if (
-                candidate.blob.size <=
-                targetBytes
-            ) {
-
-                localBest =
+                bestFineScale =
                     candidate;
 
-
-                localLow =
-                    quality;
-
-            } else {
-
-                localHigh =
-                    quality;
-
             }
-
-        }
-
-
-        if (
-            localBest &&
-            (
-                localBest.quality >
-                    best.quality ||
-                (
-                    localBest.quality ===
-                        best.quality &&
-                    localBest.scale >
-                        best.scale
-                )
-            )
-        ) {
-
-            best =
-                localBest;
 
         }
 
@@ -2374,7 +2392,71 @@ async function compressToTarget(
 
     /*
      * =====================================================
-     * GARANTÍA FINAL
+     * PASO 6
+     *
+     * Con la resolución definitiva encontrada,
+     * buscamos otra vez la máxima calidad.
+     * =====================================================
+     */
+
+    best =
+        bestFineScale;
+
+
+    lowQuality =
+        minimumQuality;
+
+
+    highQuality =
+        1;
+
+
+    for (
+        let attempt = 0;
+        attempt < 20;
+        attempt++
+    ) {
+
+        const quality =
+            (
+                lowQuality +
+                highQuality
+            ) /
+            2;
+
+
+        const candidate =
+            await createCandidate(
+                bestFineScale.scale,
+                quality
+            );
+
+
+        if (
+            candidate.blob.size <=
+            targetBytes
+        ) {
+
+            best =
+                candidate;
+
+
+            lowQuality =
+                quality;
+
+        } else {
+
+            highQuality =
+                quality;
+
+        }
+
+    }
+
+
+    /*
+     * =====================================================
+     * GARANTÍAS FINALES
      * =====================================================
      */
 
@@ -2389,6 +2471,11 @@ async function compressToTarget(
     }
 
 
+    /*
+     * Nunca permitir una calidad inferior
+     * al 90 %.
+     */
+
     if (
         best.quality <
         minimumQuality
@@ -2400,6 +2487,10 @@ async function compressToTarget(
 
     }
 
+
+    /*
+     * Nunca permitir superar el objetivo.
+     */
 
     if (
         best.blob.size >
@@ -2414,7 +2505,7 @@ async function compressToTarget(
 
 
     /*
-     * Devolver archivo final.
+     * Devolver el mejor resultado.
      */
 
     return createCompressedTargetFile(
