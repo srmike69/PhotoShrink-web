@@ -65,6 +65,9 @@ const targetContainer =
 const targetSize =
     document.getElementById("targetSize");
 
+const targetUnit =
+    document.getElementById("targetUnit");
+
 const targetOptions =
     document.querySelectorAll(
         ".target-option"
@@ -95,6 +98,51 @@ const preserveFormat =
         "preserveFormat"
     );
 
+const previewSection =
+    document.getElementById(
+        "previewSection"
+    );
+
+const previewButton =
+    document.getElementById(
+        "previewButton"
+    );
+
+const previewContent =
+    document.getElementById(
+        "previewContent"
+    );
+
+const previewOriginal =
+    document.getElementById(
+        "previewOriginal"
+    );
+
+const previewResult =
+    document.getElementById(
+        "previewResult"
+    );
+
+const previewOriginalSize =
+    document.getElementById(
+        "previewOriginalSize"
+    );
+
+const previewResultSize =
+    document.getElementById(
+        "previewResultSize"
+    );
+
+const previewQuality =
+    document.getElementById(
+        "previewQuality"
+    );
+
+const previewResolution =
+    document.getElementById(
+        "previewResolution"
+    );
+
 
 /* =========================================================
    VARIABLES
@@ -105,6 +153,22 @@ let selectedFiles = [];
 let compressedFiles = [];
 
 let selectedTargetMB = 1;
+
+let selectedTargetValue = 1;
+
+let selectedTargetUnit = "MB";
+
+let previewObjectURL = null;
+
+let previewOriginalURL = null;
+
+let easterEggClickCount = 0;
+
+let easterEggClickTimer = null;
+
+let easterEggResetTimer = null;
+
+let easterEggMessageTimer = null;
 
 
 /* =========================================================
@@ -133,7 +197,6 @@ photoInput.addEventListener(
         selectedFiles =
             files;
 
-
         compressedFiles =
             [];
 
@@ -141,7 +204,6 @@ photoInput.addEventListener(
         resultSection.classList.add(
             "hidden"
         );
-
 
         progressSection.classList.add(
             "hidden"
@@ -164,7 +226,6 @@ photoInput.addEventListener(
         emptyState.classList.add(
             "hidden"
         );
-
 
         workspace.classList.remove(
             "hidden"
@@ -448,6 +509,26 @@ function initializeQualitySelection() {
     }
 
 
+    selectedTargetValue =
+        1;
+
+    selectedTargetUnit =
+        "MB";
+
+    selectedTargetMB =
+        1;
+
+
+    if (
+        targetUnit
+    ) {
+
+        targetUnit.value =
+            "MB";
+
+    }
+
+
     updateTargetDescription();
 
 }
@@ -516,11 +597,28 @@ qualityCards.forEach(
 
                     updateTargetDescription();
 
+
+                    showPreviewSection();
+
                 } else {
 
                     targetContainer.classList.add(
                         "hidden"
                     );
+
+
+                    if (
+                        previewSection
+                    ) {
+
+                        previewSection.classList.add(
+                            "hidden"
+                        );
+
+                    }
+
+
+                    hidePreviewResult();
 
                 }
 
@@ -572,13 +670,19 @@ targetOptions.forEach(
                     );
 
 
-                    targetSize.focus();
-
-
-                    selectedTargetMB =
+                    selectedTargetValue =
                         Number(
                             targetSize.value
                         ) || 1;
+
+
+                    selectedTargetUnit =
+                        targetUnit
+                            ? targetUnit.value
+                            : "MB";
+
+
+                    targetSize.focus();
 
                 } else {
 
@@ -587,15 +691,29 @@ targetOptions.forEach(
                     );
 
 
-                    selectedTargetMB =
+                    selectedTargetValue =
                         Number(
                             size
                         );
 
+
+                    selectedTargetUnit =
+                        "MB";
+
                 }
 
 
+                selectedTargetMB =
+                    selectedTargetUnit ===
+                    "KB"
+                        ? selectedTargetValue /
+                            1024
+                        : selectedTargetValue;
+
+
                 updateTargetDescription();
+
+                showPreviewSection();
 
             }
         );
@@ -614,31 +732,62 @@ if (
 
     targetSize.addEventListener(
         "input",
-        () => {
-
-            const value =
-                Number(
-                    targetSize.value
-                );
-
-
-            if (
-                Number.isFinite(
-                    value
-                ) &&
-                value > 0
-            ) {
-
-                selectedTargetMB =
-                    value;
-
-            }
-
-
-            updateTargetDescription();
-
-        }
+        updateCustomTarget
     );
+
+}
+
+
+if (
+    targetUnit
+) {
+
+    targetUnit.addEventListener(
+        "change",
+        updateCustomTarget
+    );
+
+}
+
+
+function updateCustomTarget() {
+
+    const value =
+        Number(
+            targetSize.value
+        );
+
+
+    if (
+        Number.isFinite(
+            value
+        ) &&
+        value > 0
+    ) {
+
+        selectedTargetValue =
+            value;
+
+    }
+
+
+    selectedTargetUnit =
+        targetUnit
+            ? targetUnit.value
+            : "MB";
+
+
+    selectedTargetMB =
+        selectedTargetUnit ===
+        "KB"
+            ? selectedTargetValue /
+                1024
+            : selectedTargetValue;
+
+
+    updateTargetDescription();
+
+    hidePreviewResult();
 
 }
 
@@ -660,7 +809,7 @@ function updateTargetDescription() {
 
     const value =
         Number(
-            selectedTargetMB
+            selectedTargetValue
         );
 
 
@@ -680,31 +829,108 @@ function updateTargetDescription() {
 
 
     targetDescription.textContent =
-        `Cada foto intentará mantenerse por debajo de ${formatTargetMB(value)}.`;
+        `Cada foto intentará mantenerse por debajo de ${
+            formatTargetValue(
+                value,
+                selectedTargetUnit
+            )
+        }.`;
 
 }
 
 
-function formatTargetMB(
-    value
+function formatTargetValue(
+    value,
+    unit
 ) {
 
-    if (
+    const decimals =
         Number.isInteger(
             value
         )
+            ? 0
+            : 2;
+
+
+    return `${value
+        .toFixed(
+            decimals
+        )
+        .replace(
+            /0+$/,
+            ""
+        )
+        .replace(
+            /\.$/,
+            ""
+        )
+    } ${unit}`;
+
+}
+
+
+function getSelectedTargetBytes() {
+
+    if (
+        !Number.isFinite(
+            selectedTargetValue
+        ) ||
+        selectedTargetValue <= 0
     ) {
 
-        return `${value} MB`;
+        return null;
 
     }
 
 
-    return `${value
-        .toFixed(2)
-        .replace(/0+$/, "")
-        .replace(/\.$/, "")
-    } MB`;
+    if (
+        selectedTargetUnit ===
+        "KB"
+    ) {
+
+        return Math.floor(
+            selectedTargetValue *
+            1024
+        );
+
+    }
+
+
+    return Math.floor(
+        selectedTargetValue *
+        1024 *
+        1024
+    );
+
+}
+
+
+function showPreviewSection() {
+
+    if (
+        previewSection
+    ) {
+
+        previewSection.classList.remove(
+            "hidden"
+        );
+
+    }
+
+}
+
+
+function hidePreviewResult() {
+
+    if (
+        previewContent
+    ) {
+
+        previewContent.classList.add(
+            "hidden"
+        );
+
+    }
 
 }
 
@@ -718,7 +944,8 @@ compressButton.addEventListener(
     async () => {
 
         if (
-            selectedFiles.length === 0
+            selectedFiles.length ===
+            0
         ) {
 
             return;
@@ -773,11 +1000,13 @@ compressButton.addEventListener(
             "target"
         ) {
 
+            targetBytes =
+                getSelectedTargetBytes();
+
+
             if (
-                !Number.isFinite(
-                    selectedTargetMB
-                ) ||
-                selectedTargetMB <= 0
+                !targetBytes ||
+                targetBytes <= 0
             ) {
 
                 alert(
@@ -797,12 +1026,6 @@ compressButton.addEventListener(
                 return;
 
             }
-
-
-            targetBytes =
-                selectedTargetMB *
-                1024 *
-                1024;
 
         }
 
@@ -846,6 +1069,27 @@ compressButton.addEventListener(
                 );
 
 
+                /*
+                 * En modo objetivo NO se debe devolver
+                 * una imagen que supere el objetivo.
+                 */
+
+                if (
+                    selectedQuality ===
+                    "target"
+                ) {
+
+                    alert(
+                        `No se pudo comprimir "${file.name}" sin superar el tamaño objetivo.`
+                    );
+
+                    compressedButtonSafeReset();
+
+                    return;
+
+                }
+
+
                 compressedFiles.push(
                     file
                 );
@@ -882,6 +1126,21 @@ compressButton.addEventListener(
 
     }
 );
+
+
+function compressedButtonSafeReset() {
+
+    compressButton.disabled =
+        false;
+
+    progressSection.classList.add(
+        "hidden"
+    );
+
+    progressBar.style.width =
+        "0%";
+
+}
 
 
 /* =========================================================
@@ -954,57 +1213,6 @@ async function compressImage(
         );
 
 
-    const canvas =
-        document.createElement(
-            "canvas"
-        );
-
-
-    canvas.width =
-        image.naturalWidth;
-
-
-    canvas.height =
-        image.naturalHeight;
-
-
-    const context =
-        canvas.getContext(
-            "2d",
-            {
-                alpha:
-                    originalType !==
-                    "image/jpeg"
-            }
-        );
-
-
-    if (
-        originalType ===
-        "image/jpeg"
-    ) {
-
-        context.fillStyle =
-            "#ffffff";
-
-
-        context.fillRect(
-            0,
-            0,
-            canvas.width,
-            canvas.height
-        );
-
-    }
-
-
-    context.drawImage(
-        image,
-        0,
-        0
-    );
-
-
     const originalExif =
         preserveMetadata &&
         preserveMetadata.checked &&
@@ -1028,7 +1236,7 @@ async function compressImage(
     ) {
 
         return compressToTarget(
-            canvas,
+            image,
             file,
             targetBytes,
             originalExif,
@@ -1056,7 +1264,7 @@ async function compressImage(
 
 
         return compressToTarget(
-            canvas,
+            image,
             file,
             targetMinusOneMB,
             originalExif,
@@ -1064,6 +1272,67 @@ async function compressImage(
         );
 
     }
+
+
+    const canvas =
+        document.createElement(
+            "canvas"
+        );
+
+
+    canvas.width =
+        image.naturalWidth;
+
+    canvas.height =
+        image.naturalHeight;
+
+
+    const context =
+        canvas.getContext(
+            "2d",
+            {
+                alpha:
+                    originalType !==
+                    "image/jpeg"
+            }
+        );
+
+
+    if (
+        !context
+    ) {
+
+        throw new Error(
+            "No se pudo crear el canvas."
+        );
+
+    }
+
+
+    if (
+        originalType ===
+        "image/jpeg"
+    ) {
+
+        context.fillStyle =
+            "#ffffff";
+
+
+        context.fillRect(
+            0,
+            0,
+            canvas.width,
+            canvas.height
+        );
+
+    }
+
+
+    context.drawImage(
+        image,
+        0,
+        0
+    );
 
 
     const quality =
@@ -1094,7 +1363,8 @@ async function compressImage(
         preserveMetadata &&
         preserveMetadata.checked &&
         outputType ===
-            "image/jpeg"
+            "image/jpeg" &&
+        originalExif
     ) {
 
         blob =
@@ -1102,6 +1372,16 @@ async function compressImage(
                 blob,
                 originalExif
             );
+
+    }
+
+
+    if (
+        blob.size >=
+        file.size
+    ) {
+
+        return file;
 
     }
 
@@ -1264,16 +1544,28 @@ function getQuality(
 
 
 /* =========================================================
-   COMPRESIÓN A TAMAÑO
+   COMPRESIÓN A TAMAÑO OBJETIVO
    ========================================================= */
 
 async function compressToTarget(
-    canvas,
+    image,
     originalFile,
     targetBytes,
     originalExif,
     outputType
 ) {
+
+    if (
+        !targetBytes ||
+        targetBytes <= 0
+    ) {
+
+        throw new Error(
+            "Tamaño objetivo inválido."
+        );
+
+    }
+
 
     if (
         originalFile.size <=
@@ -1285,75 +1577,117 @@ async function compressToTarget(
     }
 
 
-    if (
+    const originalWidth =
+        image.naturalWidth;
+
+    const originalHeight =
+        image.naturalHeight;
+
+
+    /*
+     * La calidad nunca baja de 90 %.
+     *
+     * PNG no utiliza calidad JPEG, por lo que
+     * en PNG la única forma de reducir cuando
+     * hace falta es reducir resolución.
+     */
+
+    const minimumQuality =
         outputType ===
-        "image/png"
+            "image/png"
+            ? 1
+            : 0.90;
+
+
+    async function createCandidate(
+        scale,
+        quality
     ) {
 
-        const pngBlob =
-            await canvasToBlob(
-                canvas,
-                undefined,
-                outputType
+        const width =
+            Math.max(
+                1,
+                Math.round(
+                    originalWidth *
+                    scale
+                )
+            );
+
+
+        const height =
+            Math.max(
+                1,
+                Math.round(
+                    originalHeight *
+                    scale
+                )
+            );
+
+
+        const canvas =
+            document.createElement(
+                "canvas"
+            );
+
+
+        canvas.width =
+            width;
+
+        canvas.height =
+            height;
+
+
+        const context =
+            canvas.getContext(
+                "2d",
+                {
+                    alpha:
+                        outputType !==
+                        "image/jpeg"
+                }
             );
 
 
         if (
-            pngBlob.size >=
-            originalFile.size
+            !context
         ) {
 
-            return originalFile;
+            throw new Error(
+                "No se pudo crear el canvas."
+            );
 
         }
 
 
         if (
-            pngBlob.size >
-            targetBytes
+            outputType ===
+            "image/jpeg"
         ) {
 
-            return originalFile;
+            context.fillStyle =
+                "#ffffff";
+
+
+            context.fillRect(
+                0,
+                0,
+                width,
+                height
+            );
 
         }
 
 
-        return createCompressedFile(
-            pngBlob,
-            originalFile,
-            outputType
+        context.drawImage(
+            image,
+            0,
+            0,
+            width,
+            height
         );
 
-    }
 
-
-    let minimumQuality =
-        0.10;
-
-
-    let maximumQuality =
-        1.00;
-
-
-    let bestBlob =
-        null;
-
-
-    for (
-        let attempt = 0;
-        attempt < 12;
-        attempt++
-    ) {
-
-        const quality =
-            (
-                minimumQuality +
-                maximumQuality
-            ) /
-            2;
-
-
-        const blob =
+        let blob =
             await canvasToBlob(
                 canvas,
                 quality,
@@ -1361,83 +1695,349 @@ async function compressToTarget(
             );
 
 
+        /*
+         * Los metadatos se insertan ANTES de la
+         * comprobación final del tamaño.
+         */
+
         if (
-            blob.size <=
+            preserveMetadata &&
+            preserveMetadata.checked &&
+            outputType ===
+                "image/jpeg" &&
+            originalExif
+        ) {
+
+            blob =
+                await insertExifIntoJpeg(
+                    blob,
+                    originalExif
+                );
+
+        }
+
+
+        return {
+            blob,
+            width,
+            height,
+            quality:
+                outputType ===
+                    "image/png"
+                    ? 1
+                    : quality
+        };
+
+    }
+
+
+    async function findBestQuality(
+        scale
+    ) {
+
+        /*
+         * PNG:
+         * no hay control de calidad.
+         */
+
+        if (
+            outputType ===
+            "image/png"
+        ) {
+
+            const candidate =
+                await createCandidate(
+                    scale,
+                    1
+                );
+
+
+            if (
+                candidate.blob.size <=
+                targetBytes
+            ) {
+
+                return candidate;
+
+            }
+
+
+            return null;
+
+        }
+
+
+        /*
+         * Primero probamos 90 %.
+         */
+
+        const minimumCandidate =
+            await createCandidate(
+                scale,
+                minimumQuality
+            );
+
+
+        if (
+            minimumCandidate.blob.size >
             targetBytes
         ) {
 
-            bestBlob =
-                blob;
+            return null;
+
+        }
 
 
-            minimumQuality =
-                quality;
+        /*
+         * Si 90 % entra, buscamos la calidad
+         * máxima posible entre 90 y 100 %.
+         */
+
+        let low =
+            minimumQuality;
+
+        let high =
+            1;
+
+        let best =
+            minimumCandidate;
+
+
+        for (
+            let attempt = 0;
+            attempt < 16;
+            attempt++
+        ) {
+
+            const quality =
+                (
+                    low +
+                    high
+                ) /
+                2;
+
+
+            const candidate =
+                await createCandidate(
+                    scale,
+                    quality
+                );
+
+
+            if (
+                candidate.blob.size <=
+                targetBytes
+            ) {
+
+                best =
+                    candidate;
+
+                low =
+                    quality;
+
+            } else {
+
+                high =
+                    quality;
+
+            }
+
+        }
+
+
+        return best;
+
+    }
+
+
+    /*
+     * Primero intentamos mantener la resolución
+     * original.
+     */
+
+    const fullSizeCandidate =
+        await findBestQuality(
+            1
+        );
+
+
+    if (
+        fullSizeCandidate
+    ) {
+
+        return createCompressedTargetFile(
+            fullSizeCandidate,
+            originalFile,
+            targetBytes,
+            outputType
+        );
+
+    }
+
+
+    /*
+     * Si no entra, no bajamos de 90 %.
+     * Empezamos a reducir resolución.
+     */
+
+    let lowScale =
+        0.01;
+
+    let highScale =
+        1;
+
+    let best =
+        null;
+
+
+    /*
+     * Comprobamos primero una resolución mínima.
+     */
+
+    const minimumCandidate =
+        await findBestQuality(
+            0.01
+        );
+
+
+    if (
+        !minimumCandidate
+    ) {
+
+        throw new Error(
+            "El tamaño objetivo es demasiado pequeño para esta imagen."
+        );
+
+    }
+
+
+    best =
+        minimumCandidate;
+
+
+    /*
+     * Buscamos la mayor resolución que entre
+     * en el objetivo.
+     */
+
+    for (
+        let attempt = 0;
+        attempt < 16;
+        attempt++
+    ) {
+
+        const scale =
+            (
+                lowScale +
+                highScale
+            ) /
+            2;
+
+
+        const candidate =
+            await findBestQuality(
+                scale
+            );
+
+
+        if (
+            candidate &&
+            candidate.blob.size <=
+                targetBytes
+        ) {
+
+            best =
+                candidate;
+
+            lowScale =
+                scale;
 
         } else {
 
-            maximumQuality =
-                quality;
+            highScale =
+                scale;
 
         }
 
     }
 
 
+    /*
+     * Garantía absoluta:
+     * nunca devolvemos un archivo por encima
+     * del objetivo.
+     */
+
     if (
-        !bestBlob
+        !best ||
+        best.blob.size >
+            targetBytes
     ) {
 
-        bestBlob =
-            await canvasToBlob(
-                canvas,
-                0.10,
-                outputType
-            );
+        throw new Error(
+            "No se pudo alcanzar el tamaño objetivo sin superarlo."
+        );
 
     }
 
 
-    if (
-        bestBlob.size >=
-        originalFile.size
-    ) {
-
-        return originalFile;
-
-    }
-
-
-    if (
-        preserveMetadata &&
-        preserveMetadata.checked &&
-        outputType ===
-            "image/jpeg"
-    ) {
-
-        bestBlob =
-            await insertExifIntoJpeg(
-                bestBlob,
-                originalExif
-            );
-
-    }
-
-
-    if (
-        bestBlob.size >=
-        originalFile.size
-    ) {
-
-        return originalFile;
-
-    }
-
-
-    return createCompressedFile(
-        bestBlob,
+    return createCompressedTargetFile(
+        best,
         originalFile,
+        targetBytes,
         outputType
     );
+
+}
+
+
+/* =========================================================
+   CREAR ARCHIVO DE TAMAÑO OBJETIVO
+   ========================================================= */
+
+function createCompressedTargetFile(
+    candidate,
+    originalFile,
+    targetBytes,
+    outputType
+) {
+
+    if (
+        candidate.blob.size >
+        targetBytes
+    ) {
+
+        throw new Error(
+            "El archivo final supera el tamaño objetivo."
+        );
+
+    }
+
+
+    const file =
+        createCompressedFile(
+            candidate.blob,
+            originalFile,
+            outputType
+        );
+
+
+    file.__photoShrinkQuality =
+        Math.round(
+            candidate.quality *
+            100
+        );
+
+
+    file.__photoShrinkWidth =
+        candidate.width;
+
+
+    file.__photoShrinkHeight =
+        candidate.height;
+
+
+    return file;
 
 }
 
@@ -1735,7 +2335,6 @@ async function insertExifIntoJpeg(
 
         output[0] =
             jpeg[0];
-
 
         output[1] =
             jpeg[1];
@@ -2116,6 +2715,67 @@ saveButton.addEventListener(
 
 function resetPhotoShrink() {
 
+    if (
+        previewObjectURL
+    ) {
+
+        URL.revokeObjectURL(
+            previewObjectURL
+        );
+
+        previewObjectURL =
+            null;
+
+    }
+
+
+    if (
+        previewOriginalURL
+    ) {
+
+        URL.revokeObjectURL(
+            previewOriginalURL
+        );
+
+        previewOriginalURL =
+            null;
+
+    }
+
+
+    if (
+        previewContent
+    ) {
+
+        previewContent.classList.add(
+            "hidden"
+        );
+
+    }
+
+
+    if (
+        previewOriginal
+    ) {
+
+        previewOriginal.removeAttribute(
+            "src"
+        );
+
+    }
+
+
+    if (
+        previewResult
+    ) {
+
+        previewResult.removeAttribute(
+            "src"
+        );
+
+    }
+
+
     selectedFiles =
         [];
 
@@ -2282,6 +2942,444 @@ function formatMB(
 
 
 /* =========================================================
+   FORMATO BYTES
+   ========================================================= */
+
+function formatBytes(
+    bytes
+) {
+
+    if (
+        bytes <
+        1024
+    ) {
+
+        return `${bytes} B`;
+
+    }
+
+
+    const kb =
+        bytes /
+        1024;
+
+
+    if (
+        kb <
+        1024
+    ) {
+
+        return `${kb.toFixed(1)} KB`;
+
+    }
+
+
+    const mb =
+        kb /
+        1024;
+
+
+    return `${mb.toFixed(2)} MB`;
+
+}
+
+
+/* =========================================================
+   VISTA PREVIA
+   ========================================================= */
+
+if (
+    previewButton
+) {
+
+    previewButton.addEventListener(
+        "click",
+        async () => {
+
+            if (
+                selectedFiles.length ===
+                0
+            ) {
+
+                return;
+
+            }
+
+
+            const selectedQualityInput =
+                document.querySelector(
+                    'input[name="quality"]:checked'
+                );
+
+
+            if (
+                !selectedQualityInput ||
+                selectedQualityInput.value !==
+                    "target"
+            ) {
+
+                return;
+
+            }
+
+
+            const targetBytes =
+                getSelectedTargetBytes();
+
+
+            if (
+                !targetBytes ||
+                targetBytes <= 0
+            ) {
+
+                return;
+
+            }
+
+
+            previewButton.disabled =
+                true;
+
+
+            previewButton.textContent =
+                "Generando...";
+
+
+            try {
+
+                const originalFile =
+                    selectedFiles[0];
+
+
+                const image =
+                    await loadImage(
+                        originalFile
+                    );
+
+
+                const originalType =
+                    getImageMimeType(
+                        originalFile
+                    );
+
+
+                const canKeepFormat =
+                    preserveFormat &&
+                    preserveFormat.checked &&
+                    (
+                        originalType ===
+                            "image/jpeg" ||
+                        originalType ===
+                            "image/png" ||
+                        originalType ===
+                            "image/webp"
+                    );
+
+
+                const outputType =
+                    canKeepFormat
+                        ? originalType
+                        : "image/jpeg";
+
+
+                const originalExif =
+                    preserveMetadata &&
+                    preserveMetadata.checked &&
+                    originalType ===
+                        "image/jpeg"
+                        ? await extractExifSegment(
+                            originalFile
+                        )
+                        : null;
+
+
+                const result =
+                    await compressToTarget(
+                        image,
+                        originalFile,
+                        targetBytes,
+                        originalExif,
+                        outputType
+                    );
+
+
+                if (
+                    previewObjectURL
+                ) {
+
+                    URL.revokeObjectURL(
+                        previewObjectURL
+                    );
+
+                }
+
+
+                if (
+                    previewOriginalURL
+                ) {
+
+                    URL.revokeObjectURL(
+                        previewOriginalURL
+                    );
+
+                }
+
+
+                previewObjectURL =
+                    URL.createObjectURL(
+                        result
+                    );
+
+
+                previewOriginalURL =
+                    URL.createObjectURL(
+                        originalFile
+                    );
+
+
+                previewOriginal.src =
+                    previewOriginalURL;
+
+
+                previewResult.src =
+                    previewObjectURL;
+
+
+                previewOriginalSize.textContent =
+                    formatBytes(
+                        originalFile.size
+                    );
+
+
+                previewResultSize.textContent =
+                    formatBytes(
+                        result.size
+                    );
+
+
+                previewQuality.textContent =
+                    `${
+                        result.__photoShrinkQuality ||
+                        100
+                    } %`;
+
+
+                previewResolution.textContent =
+                    `${
+                        result.__photoShrinkWidth ||
+                        image.naturalWidth
+                    } × ${
+                        result.__photoShrinkHeight ||
+                        image.naturalHeight
+                    }`;
+
+
+                previewContent.classList.remove(
+                    "hidden"
+                );
+
+            } catch (
+                error
+            ) {
+
+                console.error(
+                    "Error generando la vista previa:",
+                    error
+                );
+
+
+                alert(
+                    error.message ||
+                    "No se pudo generar la vista previa."
+                );
+
+            } finally {
+
+                previewButton.disabled =
+                    false;
+
+
+                previewButton.textContent =
+                    "Previsualizar";
+
+            }
+
+        }
+    );
+
+}
+
+
+/* =========================================================
+   EASTER EGG
+   ========================================================= */
+
+function initializeEasterEgg() {
+
+    const brandIcon =
+        document.querySelector(
+            ".brand-icon"
+        );
+
+
+    const brand =
+        document.querySelector(
+            ".brand"
+        );
+
+
+    if (
+        !brandIcon ||
+        !brand
+    ) {
+
+        return;
+
+    }
+
+
+    brandIcon.addEventListener(
+        "click",
+        () => {
+
+            easterEggClickCount++;
+
+
+            clearTimeout(
+                easterEggClickTimer
+            );
+
+
+            easterEggClickTimer =
+                setTimeout(
+                    () => {
+
+                        easterEggClickCount =
+                            0;
+
+                    },
+                    2000
+                );
+
+
+            if (
+                easterEggClickCount <
+                5
+            ) {
+
+                return;
+
+            }
+
+
+            easterEggClickCount =
+                0;
+
+
+            activateEasterEgg(
+                brandIcon,
+                brand
+            );
+
+        }
+    );
+
+}
+
+
+function activateEasterEgg(
+    brandIcon,
+    brand
+) {
+
+    clearTimeout(
+        easterEggResetTimer
+    );
+
+
+    clearTimeout(
+        easterEggMessageTimer
+    );
+
+
+    brandIcon.textContent =
+        "M";
+
+
+    brandIcon.classList.add(
+        "easter-egg-active"
+    );
+
+
+    let message =
+        brand.querySelector(
+            ".easter-egg-message"
+        );
+
+
+    if (
+        !message
+    ) {
+
+        message =
+            document.createElement(
+                "p"
+            );
+
+
+        message.className =
+            "easter-egg-message";
+
+
+        brand.appendChild(
+            message
+        );
+
+    }
+
+
+    message.textContent =
+        "Hecho para ti ❤️";
+
+
+    message.classList.add(
+        "visible"
+    );
+
+
+    easterEggMessageTimer =
+        setTimeout(
+            () => {
+
+                message.classList.remove(
+                    "visible"
+                );
+
+            },
+            10000
+        );
+
+
+    easterEggResetTimer =
+        setTimeout(
+            () => {
+
+                brandIcon.textContent =
+                    "PS";
+
+
+                brandIcon.classList.remove(
+                    "easter-egg-active"
+                );
+
+            },
+            20000
+        );
+
+}
+
+
+/* =========================================================
    UTILIDADES
    ========================================================= */
 
@@ -2356,184 +3454,4 @@ if (
 
 initializeQualitySelection();
 
-
-
-/* =========================================================
-   EASTER EGG
-   ========================================================= */
-
-(function initializeEasterEgg() {
-
-    const brandIcon =
-        document.querySelector(
-            ".brand-icon"
-        );
-
-    if (
-        !brandIcon
-    ) {
-
-        return;
-
-    }
-
-
-    let taps =
-        0;
-
-    let resetTimer =
-        null;
-
-    const originalText =
-        brandIcon.textContent;
-
-
-    /* =====================================================
-       MENSAJE
-       ===================================================== */
-
-    const message =
-        document.createElement(
-            "div"
-        );
-
-
-    message.className =
-        "easter-egg-message";
-
-
-    message.innerHTML = `
-        <div class="easter-egg-heart">
-            ♥
-        </div>
-
-        <div class="easter-egg-text">
-            Hecho especialmente para ti.
-        </div>
-    `;
-
-
-    document.body.appendChild(
-        message
-    );
-
-
-    /* =====================================================
-       ACTIVAR EASTER EGG
-       ===================================================== */
-
-    function activateEasterEgg() {
-
-        taps =
-            0;
-
-
-        clearTimeout(
-            resetTimer
-        );
-
-
-        /*
-         * Cambiar PS por M
-         */
-
-        brandIcon.classList.add(
-            "easter-active"
-        );
-
-
-        brandIcon.textContent =
-            "M";
-
-
-        /*
-         * Mostrar mensaje
-         */
-
-        message.classList.add(
-            "show"
-        );
-
-
-        /*
-         * El mensaje dura 10 segundos
-         */
-
-        window.setTimeout(
-            () => {
-
-                message.classList.remove(
-                    "show"
-                );
-
-            },
-            10000
-        );
-
-
-        /*
-         * El icono vuelve a PS
-         * después de 20 segundos
-         */
-
-        window.setTimeout(
-            () => {
-
-                brandIcon.classList.remove(
-                    "easter-active"
-                );
-
-
-                brandIcon.textContent =
-                    originalText;
-
-            },
-            20000
-        );
-
-    }
-
-
-    /* =====================================================
-       DETECTAR 5 TOQUES
-       ===================================================== */
-
-    brandIcon.addEventListener(
-        "click",
-        () => {
-
-            taps++;
-
-
-            clearTimeout(
-                resetTimer
-            );
-
-
-            if (
-                taps >=
-                5
-            ) {
-
-                activateEasterEgg();
-
-                return;
-
-            }
-
-
-            resetTimer =
-                window.setTimeout(
-                    () => {
-
-                        taps =
-                            0;
-
-                    },
-                    1200
-                );
-
-        }
-    );
-
-})();
+initializeEasterEgg();

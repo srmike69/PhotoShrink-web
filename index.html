@@ -61,10 +61,7 @@
 
             <div class="brand">
 
-                <div
-                    class="brand-icon"
-                    id="easterEggLogo"
-                >
+                <div class="brand-icon">
                     PS
                 </div>
 
@@ -470,15 +467,29 @@
                             <input
                                 id="targetSize"
                                 type="number"
-                                min="0.1"
-                                step="0.1"
+                                min="1"
+                                step="1"
                                 value="1"
                                 inputmode="decimal"
                             >
 
-                            <span>
-                                MB
-                            </span>
+                            <select
+                                id="targetUnit"
+                                aria-label="Unidad de tamaño"
+                            >
+
+                                <option value="KB">
+                                    KB
+                                </option>
+
+                                <option
+                                    value="MB"
+                                    selected
+                                >
+                                    MB
+                                </option>
+
+                            </select>
 
                         </div>
 
@@ -491,6 +502,127 @@
                     >
                         Cada foto intentará mantenerse por debajo de 1 MB.
                     </p>
+
+
+                    <!-- VISTA PREVIA -->
+
+                    <div
+                        id="previewSection"
+                        class="target-preview hidden"
+                    >
+
+                        <div class="target-preview-header">
+
+                            <h3>
+                                Vista previa
+                            </h3>
+
+                            <button
+                                id="previewButton"
+                                class="text-button"
+                                type="button"
+                            >
+                                Previsualizar
+                            </button>
+
+                        </div>
+
+
+                        <div
+                            id="previewContent"
+                            class="preview-content hidden"
+                        >
+
+                            <div class="preview-images">
+
+                                <div class="preview-image-card">
+
+                                    <span>
+                                        Original
+                                    </span>
+
+                                    <img
+                                        id="previewOriginal"
+                                        alt="Vista previa original"
+                                    >
+
+                                </div>
+
+
+                                <div class="preview-image-card">
+
+                                    <span>
+                                        Resultado
+                                    </span>
+
+                                    <img
+                                        id="previewResult"
+                                        alt="Vista previa comprimida"
+                                    >
+
+                                </div>
+
+                            </div>
+
+
+                            <div class="preview-info">
+
+                                <div>
+
+                                    <span>
+                                        Tamaño original
+                                    </span>
+
+                                    <strong id="previewOriginalSize">
+                                        -
+                                    </strong>
+
+                                </div>
+
+
+                                <div>
+
+                                    <span>
+                                        Tamaño resultado
+                                    </span>
+
+                                    <strong id="previewResultSize">
+                                        -
+                                    </strong>
+
+                                </div>
+
+
+                                <div>
+
+                                    <span>
+                                        Calidad
+                                    </span>
+
+                                    <strong id="previewQuality">
+                                        -
+                                    </strong>
+
+                                </div>
+
+
+                                <div>
+
+                                    <span>
+                                        Resolución
+                                    </span>
+
+                                    <strong id="previewResolution">
+                                        -
+                                    </strong>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
 
                 </div>
 
