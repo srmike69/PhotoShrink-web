@@ -1071,7 +1071,7 @@ button {
 }
 
 
-.brand-icon.easter-active {
+.brand-icon.easter-egg-active {
     transform:
         scale(1.12);
 
@@ -1153,6 +1153,12 @@ button {
             0.45
         );
 
+    color: #ffffff;
+
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 1.4;
+
     text-align: center;
 
     opacity: 0;
@@ -1189,7 +1195,7 @@ button {
 }
 
 
-.easter-egg-message.show {
+.easter-egg-message.visible {
     opacity: 1;
 
     transform:
