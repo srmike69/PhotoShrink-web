@@ -3916,7 +3916,7 @@ function activateEasterEgg(
 
 
     message.textContent =
-        "Hecho para ti ❤️";
+    "Si has encontrado esto, ya sabes el secreto: esta app la hice pensando en ti. Porque, de alguna manera, siempre termino dejando un pedacito de ti en las cosas que hago ❤️";
 
 
     message.classList.add(
