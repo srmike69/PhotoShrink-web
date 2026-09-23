@@ -2755,6 +2755,62 @@ function createJpegAppSegment(
 }
 
 
+/* =========================================================
+   ORIENTACIÓN EXIF: evitar giro doble tras canvas
+   ========================================================= */
+
+function normalizeExifOrientationSegment(segment) {
+    if (!segment || segment.length < 22 ||
+        segment[0] !== 0xFF || segment[1] !== 0xE1) {
+        return segment;
+    }
+
+    // APP1: marcador(2), longitud(2), "Exif\0\0"(6), TIFF.
+    const exif = [0x45, 0x78, 0x69, 0x66, 0, 0];
+    if (!exif.every((byte, i) => segment[4 + i] === byte)) {
+        return segment;
+    }
+
+    const tiff = 10;
+    const little = segment[tiff] === 0x49 && segment[tiff + 1] === 0x49;
+    const big = segment[tiff] === 0x4D && segment[tiff + 1] === 0x4D;
+    if (!little && !big) return segment;
+
+    const read16 = pos => little
+        ? segment[pos] | (segment[pos + 1] << 8)
+        : (segment[pos] << 8) | segment[pos + 1];
+    const read32 = pos => little
+        ? ((segment[pos] | (segment[pos + 1] << 8) |
+            (segment[pos + 2] << 16) | (segment[pos + 3] * 0x1000000)) >>> 0)
+        : ((segment[pos] * 0x1000000 + (segment[pos + 1] << 16) +
+            (segment[pos + 2] << 8) + segment[pos + 3]) >>> 0);
+
+    if (read16(tiff + 2) !== 42) return segment;
+    const ifd = tiff + read32(tiff + 4);
+    if (ifd < tiff + 8 || ifd + 2 > segment.length) return segment;
+    const count = read16(ifd);
+    if (count > 1024 || ifd + 2 + count * 12 > segment.length) return segment;
+
+    for (let i = 0; i < count; i++) {
+        const entry = ifd + 2 + i * 12;
+        // Tag 0x0112, SHORT (3), count 1, inline value at +8.
+        if (read16(entry) === 0x0112 &&
+            read16(entry + 2) === 3 && read32(entry + 4) === 1) {
+            const normalized = segment.slice();
+            if (little) {
+                normalized[entry + 8] = 1;
+                normalized[entry + 9] = 0;
+            } else {
+                normalized[entry + 8] = 0;
+                normalized[entry + 9] = 1;
+            }
+            return normalized;
+        }
+    }
+    return segment;
+}
+
+
 async function insertMetadataIntoJpeg(
     blob,
     segments
@@ -2789,8 +2845,17 @@ async function insertMetadataIntoJpeg(
     }
 
 
+    /* Canvas exporta los píxeles con la orientación ya aplicada por
+     * el navegador. Si copiamos Orientation=6/8 del original, Fotos
+     * vuelve a girar el JPEG final. Normalizamos SOLO ese campo a 1;
+     * fecha, GPS, cámara y demás EXIF permanecen intactos.
+     */
+    const uprightSegments =
+        segments.map(normalizeExifOrientationSegment);
+
+
     const validSegments =
-        segments.filter(
+        uprightSegments.filter(
             segment =>
                 segment &&
                 segment.length >= 4
