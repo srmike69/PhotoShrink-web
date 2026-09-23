@@ -962,28 +962,56 @@ async function compressImage(
     if (
         !file.type.startsWith("image/")
     ) {
+
         return file;
+
     }
 
+
     const originalType =
-        getImageMimeType(file);
+        getImageMimeType(
+            file
+        );
+
 
     const image =
-        await loadImage(file);
+        await loadImage(
+            file
+        );
 
-    const originalExif =
+
+    /*
+     * Para el modo Tamaño objetivo no obligamos a conservar
+     * PNG/WebP/HEIC. El archivo final se codifica como JPEG,
+     * igual que en el comportamiento de referencia de PhotoShrink.
+     *
+     * Esto permite reducciones muy grandes manteniendo exactamente
+     * el ancho y el alto originales.
+     */
+    const outputType =
+        "image/jpeg";
+
+
+    /*
+     * Extraemos todos los metadatos que podamos transportar al JPEG
+     * final ANTES de dibujar la imagen en canvas, ya que canvas los elimina.
+     */
+    const originalMetadata =
         preserveMetadata &&
-        preserveMetadata.checked &&
-        originalType === "image/jpeg"
-            ? await extractExifSegment(file)
-            : null;
+        preserveMetadata.checked
+            ? await extractPortableMetadata(
+                file,
+                originalType
+            )
+            : [];
+
 
     return compressToTarget(
         image,
         file,
         targetBytes,
-        originalExif,
-        originalType
+        originalMetadata,
+        outputType
     );
 
 }
@@ -1375,7 +1403,7 @@ async function compressToTarget(
     image,
     originalFile,
     targetBytes,
-    originalExif,
+    originalMetadata,
     outputType
 ) {
 
@@ -1390,11 +1418,6 @@ async function compressToTarget(
 
     }
 
-
-    /*
-     * Si la original ya está dentro del objetivo,
-     * no la recomprimimos.
-     */
 
     if (
         originalFile.size <=
@@ -1420,10 +1443,8 @@ async function compressToTarget(
         originalResult.__photoShrinkQuality =
             100;
 
-
         originalResult.__photoShrinkWidth =
             image.naturalWidth;
-
 
         originalResult.__photoShrinkHeight =
             image.naturalHeight;
@@ -1437,226 +1458,189 @@ async function compressToTarget(
     const originalWidth =
         image.naturalWidth;
 
-
     const originalHeight =
         image.naturalHeight;
 
 
     /*
-     * Calidad mínima: 90 %.
-     * Nunca bajamos de este valor.
+     * La resolución NO se modifica.
      */
+    const canvas =
+        document.createElement(
+            "canvas"
+        );
 
-    const minimumQuality =
-        outputType ===
-            "image/png"
-            ? 1
-            : 0.90;
+
+    canvas.width =
+        originalWidth;
+
+    canvas.height =
+        originalHeight;
+
+
+    const context =
+        canvas.getContext(
+            "2d",
+            {
+                alpha:
+                    false
+            }
+        );
+
+
+    if (
+        !context
+    ) {
+
+        throw new Error(
+            "No se pudo crear el canvas."
+        );
+
+    }
 
 
     /*
-     * Genera un candidato y añade los metadatos
-     * antes de comprobar su tamaño definitivo.
+     * JPEG no admite transparencia.
      */
+    context.fillStyle =
+        "#ffffff";
+
+    context.fillRect(
+        0,
+        0,
+        originalWidth,
+        originalHeight
+    );
+
+
+    context.imageSmoothingEnabled =
+        true;
+
+    context.imageSmoothingQuality =
+        "high";
+
+
+    context.drawImage(
+        image,
+        0,
+        0,
+        originalWidth,
+        originalHeight
+    );
+
 
     async function createCandidate(
-        scale,
         quality
     ) {
-
-        const width =
-            Math.max(
-                1,
-                Math.round(
-                    originalWidth *
-                    scale
-                )
-            );
-
-
-        const height =
-            Math.max(
-                1,
-                Math.round(
-                    originalHeight *
-                    scale
-                )
-            );
-
-
-        const canvas =
-            document.createElement(
-                "canvas"
-            );
-
-
-        canvas.width =
-            width;
-
-
-        canvas.height =
-            height;
-
-
-        const context =
-            canvas.getContext(
-                "2d",
-                {
-                    alpha:
-                        outputType !==
-                        "image/jpeg"
-                }
-            );
-
-
-        if (
-            !context
-        ) {
-
-            throw new Error(
-                "No se pudo crear el canvas."
-            );
-
-        }
-
-
-        if (
-            outputType ===
-            "image/jpeg"
-        ) {
-
-            context.fillStyle =
-                "#ffffff";
-
-
-            context.fillRect(
-                0,
-                0,
-                width,
-                height
-            );
-
-        }
-
-
-        context.imageSmoothingEnabled =
-            true;
-
-
-        context.imageSmoothingQuality =
-            "high";
-
-
-        context.drawImage(
-            image,
-            0,
-            0,
-            width,
-            height
-        );
-
 
         let blob =
             await canvasToBlob(
                 canvas,
-                outputType ===
-                    "image/png"
-                    ? undefined
-                    : quality,
+                quality,
                 outputType
             );
 
 
         /*
-         * Los metadatos forman parte del tamaño final.
+         * Los metadatos se insertan antes de comprobar el tamaño,
+         * para que el límite solicitado corresponda al archivo REAL.
          */
-
         if (
             preserveMetadata &&
             preserveMetadata.checked &&
-            outputType ===
-                "image/jpeg" &&
-            originalExif
+            originalMetadata &&
+            originalMetadata.length
         ) {
 
             blob =
-                await insertExifIntoJpeg(
+                await insertMetadataIntoJpeg(
                     blob,
-                    originalExif
+                    originalMetadata
                 );
 
         }
 
 
         return {
-
             blob,
-
-            width,
-
-            height,
-
-            quality:
-                outputType ===
-                    "image/png"
-                    ? 1
-                    : quality,
-
-            scale
-
+            width:
+                originalWidth,
+            height:
+                originalHeight,
+            quality,
+            scale:
+                1
         };
 
     }
 
 
     /*
-     * PNG: la calidad no controla el tamaño.
-     * Solo reducimos resolución.
+     * Buscamos la calidad de codificación más alta que entre.
+     * El valor del encoder NO equivale a un porcentaje visual.
      */
+    const minimumEncoderQuality =
+        0.01;
+
+    const maximumEncoderQuality =
+        1.00;
+
+
+    const minimumCandidate =
+        await createCandidate(
+            minimumEncoderQuality
+        );
+
 
     if (
-        outputType ===
-        "image/png"
+        minimumCandidate.blob.size >
+        targetBytes
     ) {
 
-        let low =
-            0.01;
+        throw new Error(
+            "El tamaño objetivo es menor que el mínimo posible manteniendo la resolución y los metadatos."
+        );
+
+    }
 
 
-        let high =
-            1;
+    let best =
+        minimumCandidate;
+
+    let low =
+        minimumEncoderQuality;
+
+    let high =
+        maximumEncoderQuality;
 
 
-        const minimumCandidate =
-            await createCandidate(
-                low,
-                1
-            );
+    const maximumCandidate =
+        await createCandidate(
+            maximumEncoderQuality
+        );
 
 
-        if (
-            minimumCandidate.blob.size >
-            targetBytes
-        ) {
+    if (
+        maximumCandidate.blob.size <=
+        targetBytes
+    ) {
 
-            throw new Error(
-                "El tamaño objetivo es demasiado pequeño para esta imagen."
-            );
+        best =
+            maximumCandidate;
 
-        }
+    } else {
 
-
-        let best =
-            minimumCandidate;
-
-
+        /*
+         * Búsqueda binaria de la mayor calidad que no supere
+         * el tamaño solicitado.
+         */
         for (
             let attempt = 0;
-            attempt < 18;
+            attempt < 24;
             attempt++
         ) {
 
-            const scale =
+            const quality =
                 (
                     low +
                     high
@@ -1666,8 +1650,7 @@ async function compressToTarget(
 
             const candidate =
                 await createCandidate(
-                    scale,
-                    1
+                    quality
                 );
 
 
@@ -1679,516 +1662,30 @@ async function compressToTarget(
                 best =
                     candidate;
 
-
                 low =
-                    scale;
+                    quality;
 
             } else {
 
                 high =
-                    scale;
+                    quality;
 
             }
 
         }
 
-
-        return createCompressedTargetFile(
-            best,
-            originalFile,
-            targetBytes,
-            outputType
-        );
-
     }
 
-
-    /*
-     * JPEG / WEBP
-     *
-     * Buscamos la combinación que conserve mejor
-     * la imagen visualmente sin superar el objetivo.
-     *
-     * La resolución tiene prioridad sobre bajar
-     * la calidad por debajo del 90 %, que está prohibido.
-     */
-
-    const scaleCandidates = [
-
-        1.00,
-        0.975,
-        0.95,
-        0.925,
-        0.90,
-        0.875,
-        0.85,
-        0.825,
-        0.80,
-        0.775,
-        0.75,
-        0.725,
-        0.70,
-        0.675,
-        0.65,
-        0.625,
-        0.60,
-        0.575,
-        0.55,
-        0.525,
-        0.50,
-        0.475,
-        0.45,
-        0.425,
-        0.40,
-        0.375,
-        0.35,
-        0.325,
-        0.30,
-        0.275,
-        0.25,
-        0.225,
-        0.20,
-        0.175,
-        0.15,
-        0.125,
-        0.10,
-        0.075,
-        0.05,
-        0.025,
-        0.01
-
-    ];
-
-
-    const qualityCandidates = [
-
-        1.00,
-        0.99,
-        0.98,
-        0.97,
-        0.96,
-        0.95,
-        0.94,
-        0.93,
-        0.92,
-        0.91,
-        0.90
-
-    ];
-
-
-    let best =
-        null;
-
-
-    /*
-     * Primero comprobamos si existe una solución
-     * manteniendo la resolución original.
-     */
-
-    for (
-        const quality of
-        qualityCandidates
-    ) {
-
-        const candidate =
-            await createCandidate(
-                1,
-                quality
-            );
-
-
-        if (
-            candidate.blob.size <=
-            targetBytes
-        ) {
-
-            best =
-                candidate;
-
-            break;
-
-        }
-
-    }
-
-
-    /*
-     * Si la resolución original no entra,
-     * buscamos la MAYOR resolución posible
-     * que permita una calidad de al menos 90 %.
-     *
-     * Para cada resolución buscamos después
-     * la mayor calidad posible.
-     */
 
     if (
-        !best
-    ) {
-
-        let lowScale =
-            0.01;
-
-
-        let highScale =
-            1;
-
-
-        /*
-         * Comprobamos primero que una resolución
-         * mínima sea suficiente.
-         */
-
-        const minimumCandidate =
-            await createCandidate(
-                0.01,
-                minimumQuality
-            );
-
-
-        if (
-            minimumCandidate.blob.size >
-            targetBytes
-        ) {
-
-            throw new Error(
-                "El tamaño objetivo es demasiado pequeño para esta imagen."
-            );
-
-        }
-
-
-        best =
-            minimumCandidate;
-
-
-        /*
-         * Búsqueda binaria de resolución.
-         *
-         * En cada punto usamos 90 % para saber
-         * si esa resolución cabe.
-         */
-
-        for (
-            let attempt = 0;
-            attempt < 18;
-            attempt++
-        ) {
-
-            const scale =
-                (
-                    lowScale +
-                    highScale
-                ) /
-                2;
-
-
-            const candidate =
-                await createCandidate(
-                    scale,
-                    minimumQuality
-                );
-
-
-            if (
-                candidate.blob.size <=
-                targetBytes
-            ) {
-
-                best =
-                    candidate;
-
-
-                lowScale =
-                    scale;
-
-            } else {
-
-                highScale =
-                    scale;
-
-            }
-
-        }
-
-
-        /*
-         * Ahora tenemos la mayor resolución posible
-         * aproximadamente.
-         *
-         * Buscamos la calidad máxima que entre.
-         */
-
-        let lowQuality =
-            minimumQuality;
-
-
-        let highQuality =
-            1;
-
-
-        const resolution =
-            lowScale;
-
-
-        const baseCandidate =
-            await createCandidate(
-                resolution,
-                minimumQuality
-            );
-
-
-        if (
-            baseCandidate.blob.size <=
-            targetBytes
-        ) {
-
-            best =
-                baseCandidate;
-
-        }
-
-
-        for (
-            let attempt = 0;
-            attempt < 18;
-            attempt++
-        ) {
-
-            const quality =
-                (
-                    lowQuality +
-                    highQuality
-                ) /
-                2;
-
-
-            const candidate =
-                await createCandidate(
-                    resolution,
-                    quality
-                );
-
-
-            if (
-                candidate.blob.size <=
-                targetBytes
-            ) {
-
-                best =
-                    candidate;
-
-
-                lowQuality =
-                    quality;
-
-            } else {
-
-                highQuality =
-                    quality;
-
-            }
-
-        }
-
-    }
-
-
-    /*
-     * Búsqueda fina alrededor de la mejor resolución.
-     *
-     * Sirve para aprovechar los últimos KB sin
-     * sacrificar resolución innecesariamente.
-     */
-
-    const bestScale =
-        best.scale;
-
-
-    const fineScales = [
-
-        bestScale * 1.025,
-        bestScale * 1.015,
-        bestScale * 1.005,
-        bestScale,
-        bestScale * 0.995,
-        bestScale * 0.985,
-        bestScale * 0.975
-
-    ]
-        .filter(
-            scale =>
-                scale > 0 &&
-                scale <= 1
-        );
-
-
-    for (
-        const scale of
-        fineScales
-    ) {
-
-        let lowQuality =
-            minimumQuality;
-
-
-        let highQuality =
-            1;
-
-
-        /*
-         * Primero comprobamos 100 %.
-         * Si entra, es automáticamente preferible
-         * a bajar calidad.
-         */
-
-        const maximumCandidate =
-            await createCandidate(
-                scale,
-                1
-            );
-
-
-        if (
-            maximumCandidate.blob.size <=
-            targetBytes
-        ) {
-
-            if (
-                scale >=
-                best.scale
-            ) {
-
-                best =
-                    maximumCandidate;
-
-            }
-
-            continue;
-
-        }
-
-
-        /*
-         * Si 100 % no entra, buscamos la máxima
-         * calidad posible sin bajar de 90 %.
-         */
-
-        const minimumCandidate =
-            await createCandidate(
-                scale,
-                minimumQuality
-            );
-
-
-        if (
-            minimumCandidate.blob.size >
-            targetBytes
-        ) {
-
-            continue;
-
-        }
-
-
-        let fineBest =
-            minimumCandidate;
-
-
-        for (
-            let attempt = 0;
-            attempt < 14;
-            attempt++
-        ) {
-
-            const quality =
-                (
-                    lowQuality +
-                    highQuality
-                ) /
-                2;
-
-
-            const candidate =
-                await createCandidate(
-                    scale,
-                    quality
-                );
-
-
-            if (
-                candidate.blob.size <=
-                targetBytes
-            ) {
-
-                fineBest =
-                    candidate;
-
-
-                lowQuality =
-                    quality;
-
-            } else {
-
-                highQuality =
-                    quality;
-
-            }
-
-        }
-
-
-        /*
-         * Elegimos primero la resolución más alta.
-         * Si la resolución es prácticamente igual,
-         * elegimos la mayor calidad.
-         */
-
-        const currentPixelCount =
-            best.width *
-            best.height;
-
-
-        const candidatePixelCount =
-            fineBest.width *
-            fineBest.height;
-
-
-        if (
-            candidatePixelCount >
-            currentPixelCount
-        ) {
-
-            best =
-                fineBest;
-
-        } else if (
-            candidatePixelCount ===
-            currentPixelCount &&
-            fineBest.quality >
-            best.quality
-        ) {
-
-            best =
-                fineBest;
-
-        }
-
-    }
-
-
-    /*
-     * Garantía final.
-     */
-
-    if (
-        !best ||
-        best.blob.size >
-            targetBytes
+        best.width !==
+            originalWidth ||
+        best.height !==
+            originalHeight
     ) {
 
         throw new Error(
-            "No se pudo alcanzar el tamaño objetivo sin superarlo."
+            "La resolución final no coincide con la original."
         );
 
     }
@@ -2304,6 +1801,750 @@ function canvasToBlob(
                 quality
             );
 
+        }
+    );
+
+}
+
+
+/* =========================================================
+   METADATOS PORTABLES
+   ========================================================= */
+
+/*
+ * Canvas elimina los metadatos. Estas funciones extraen los bloques
+ * que pueden transportarse de forma válida a un JPEG final:
+ *
+ * JPEG: EXIF/XMP (APP1), ICC (APP2), IPTC/Photoshop (APP13), COM.
+ * PNG:  eXIf -> APP1 EXIF.
+ * WebP: EXIF -> APP1 EXIF.
+ *
+ * Los bloques que no tienen una representación JPEG válida no se
+ * inventan ni se descartan silenciosamente como si se hubieran
+ * conservado. El archivo final conserva todo lo que el formato JPEG
+ * permite transportar de forma válida.
+ */
+
+async function extractPortableMetadata(
+    file,
+    originalType
+) {
+
+    try {
+
+        const bytes =
+            new Uint8Array(
+                await file.arrayBuffer()
+            );
+
+
+        if (
+            originalType ===
+                "image/jpeg" ||
+            originalType ===
+                "image/jpg"
+        ) {
+
+            return extractJpegMetadataSegments(
+                bytes
+            );
+
+        }
+
+
+        if (
+            originalType ===
+            "image/png"
+        ) {
+
+            return extractPngPortableMetadata(
+                bytes
+            );
+
+        }
+
+
+        if (
+            originalType ===
+            "image/webp"
+        ) {
+
+            return extractWebpPortableMetadata(
+                bytes
+            );
+
+        }
+
+
+        /*
+         * HEIC/HEIF: Safari puede decodificar la imagen, pero el navegador
+         * no expone de forma uniforme sus metadatos ISO-BMFF a JavaScript.
+         * Conservamos al menos lastModified en el File final. No fabricamos
+         * EXIF inexistente.
+         */
+        return [];
+
+    } catch (
+        error
+    ) {
+
+        console.warn(
+            "No se pudieron extraer los metadatos:",
+            error
+        );
+
+
+        return [];
+
+    }
+
+}
+
+
+function extractJpegMetadataSegments(
+    bytes
+) {
+
+    const segments = [];
+
+
+    if (
+        bytes.length < 4 ||
+        bytes[0] !== 0xFF ||
+        bytes[1] !== 0xD8
+    ) {
+
+        return segments;
+
+    }
+
+
+    let offset =
+        2;
+
+
+    while (
+        offset + 4 <=
+        bytes.length
+    ) {
+
+        if (
+            bytes[offset] !==
+            0xFF
+        ) {
+
+            break;
+
+        }
+
+
+        const marker =
+            bytes[
+                offset + 1
+            ];
+
+
+        if (
+            marker ===
+                0xDA ||
+            marker ===
+                0xD9
+        ) {
+
+            break;
+
+        }
+
+
+        if (
+            marker ===
+                0xD8 ||
+            marker ===
+                0x01 ||
+            (
+                marker >=
+                    0xD0 &&
+                marker <=
+                    0xD7
+            )
+        ) {
+
+            offset +=
+                2;
+
+            continue;
+
+        }
+
+
+        const length =
+            (
+                bytes[
+                    offset + 2
+                ] << 8
+            ) |
+            bytes[
+                offset + 3
+            ];
+
+
+        if (
+            length < 2 ||
+            offset +
+                2 +
+                length >
+                bytes.length
+        ) {
+
+            break;
+
+        }
+
+
+        /*
+         * APP1 = EXIF/XMP
+         * APP2 = ICC
+         * APP13 = IPTC/Photoshop
+         * COM = comentario
+         */
+        if (
+            marker ===
+                0xE1 ||
+            marker ===
+                0xE2 ||
+            marker ===
+                0xED ||
+            marker ===
+                0xFE
+        ) {
+
+            segments.push(
+                bytes.slice(
+                    offset,
+                    offset +
+                        2 +
+                        length
+                )
+            );
+
+        }
+
+
+        offset +=
+            2 +
+            length;
+
+    }
+
+
+    return segments;
+
+}
+
+
+function extractPngPortableMetadata(
+    bytes
+) {
+
+    const segments = [];
+
+
+    if (
+        bytes.length < 8 ||
+        bytes[0] !== 0x89 ||
+        bytes[1] !== 0x50 ||
+        bytes[2] !== 0x4E ||
+        bytes[3] !== 0x47
+    ) {
+
+        return segments;
+
+    }
+
+
+    let offset =
+        8;
+
+
+    while (
+        offset + 12 <=
+        bytes.length
+    ) {
+
+        const length =
+            (
+                bytes[offset] *
+                    0x1000000
+            ) +
+            (
+                bytes[offset + 1] <<
+                    16
+            ) +
+            (
+                bytes[offset + 2] <<
+                    8
+            ) +
+            bytes[offset + 3];
+
+
+        const type =
+            String.fromCharCode(
+                bytes[offset + 4],
+                bytes[offset + 5],
+                bytes[offset + 6],
+                bytes[offset + 7]
+            );
+
+
+        const dataStart =
+            offset + 8;
+
+        const dataEnd =
+            dataStart +
+            length;
+
+
+        if (
+            dataEnd + 4 >
+            bytes.length
+        ) {
+
+            break;
+
+        }
+
+
+        if (
+            type ===
+            "eXIf"
+        ) {
+
+            const exifPayload =
+                bytes.slice(
+                    dataStart,
+                    dataEnd
+                );
+
+
+            const prefix =
+                new Uint8Array([
+                    0x45,
+                    0x78,
+                    0x69,
+                    0x66,
+                    0x00,
+                    0x00
+                ]);
+
+
+            const payload =
+                new Uint8Array(
+                    prefix.length +
+                    exifPayload.length
+                );
+
+
+            payload.set(
+                prefix,
+                0
+            );
+
+            payload.set(
+                exifPayload,
+                prefix.length
+            );
+
+
+            const segment =
+                createJpegAppSegment(
+                    0xE1,
+                    payload
+                );
+
+
+            if (
+                segment
+            ) {
+
+                segments.push(
+                    segment
+                );
+
+            }
+
+        }
+
+
+        offset =
+            dataEnd + 4;
+
+
+        if (
+            type ===
+            "IEND"
+        ) {
+
+            break;
+
+        }
+
+    }
+
+
+    return segments;
+
+}
+
+
+function extractWebpPortableMetadata(
+    bytes
+) {
+
+    const segments = [];
+
+
+    if (
+        bytes.length < 12 ||
+        String.fromCharCode(
+            ...bytes.slice(
+                0,
+                4
+            )
+        ) !==
+            "RIFF" ||
+        String.fromCharCode(
+            ...bytes.slice(
+                8,
+                12
+            )
+        ) !==
+            "WEBP"
+    ) {
+
+        return segments;
+
+    }
+
+
+    let offset =
+        12;
+
+
+    while (
+        offset + 8 <=
+        bytes.length
+    ) {
+
+        const type =
+            String.fromCharCode(
+                bytes[offset],
+                bytes[offset + 1],
+                bytes[offset + 2],
+                bytes[offset + 3]
+            );
+
+
+        const length =
+            bytes[offset + 4] |
+            (
+                bytes[offset + 5] <<
+                8
+            ) |
+            (
+                bytes[offset + 6] <<
+                16
+            ) |
+            (
+                bytes[offset + 7] <<
+                24
+            );
+
+
+        const dataStart =
+            offset + 8;
+
+        const dataEnd =
+            dataStart +
+            length;
+
+
+        if (
+            dataEnd >
+            bytes.length
+        ) {
+
+            break;
+
+        }
+
+
+        if (
+            type ===
+            "EXIF"
+        ) {
+
+            let exifPayload =
+                bytes.slice(
+                    dataStart,
+                    dataEnd
+                );
+
+
+            const hasExifPrefix =
+                exifPayload.length >= 6 &&
+                exifPayload[0] === 0x45 &&
+                exifPayload[1] === 0x78 &&
+                exifPayload[2] === 0x69 &&
+                exifPayload[3] === 0x66 &&
+                exifPayload[4] === 0x00 &&
+                exifPayload[5] === 0x00;
+
+
+            if (
+                !hasExifPrefix
+            ) {
+
+                const prefix =
+                    new Uint8Array([
+                        0x45,
+                        0x78,
+                        0x69,
+                        0x66,
+                        0x00,
+                        0x00
+                    ]);
+
+
+                const combined =
+                    new Uint8Array(
+                        prefix.length +
+                        exifPayload.length
+                    );
+
+
+                combined.set(
+                    prefix,
+                    0
+                );
+
+                combined.set(
+                    exifPayload,
+                    prefix.length
+                );
+
+
+                exifPayload =
+                    combined;
+
+            }
+
+
+            const segment =
+                createJpegAppSegment(
+                    0xE1,
+                    exifPayload
+                );
+
+
+            if (
+                segment
+            ) {
+
+                segments.push(
+                    segment
+                );
+
+            }
+
+        }
+
+
+        offset =
+            dataEnd +
+            (
+                length %
+                2
+            );
+
+    }
+
+
+    return segments;
+
+}
+
+
+function createJpegAppSegment(
+    marker,
+    payload
+) {
+
+    /*
+     * El campo length de JPEG es de 16 bits e incluye sus propios 2 bytes.
+     */
+    if (
+        !payload ||
+        payload.length + 2 >
+            0xFFFF
+    ) {
+
+        return null;
+
+    }
+
+
+    const length =
+        payload.length + 2;
+
+
+    const segment =
+        new Uint8Array(
+            payload.length + 4
+        );
+
+
+    segment[0] =
+        0xFF;
+
+    segment[1] =
+        marker;
+
+    segment[2] =
+        (
+            length >>
+            8
+        ) &
+        0xFF;
+
+    segment[3] =
+        length &
+        0xFF;
+
+
+    segment.set(
+        payload,
+        4
+    );
+
+
+    return segment;
+
+}
+
+
+async function insertMetadataIntoJpeg(
+    blob,
+    segments
+) {
+
+    if (
+        !segments ||
+        !segments.length
+    ) {
+
+        return blob;
+
+    }
+
+
+    const jpeg =
+        new Uint8Array(
+            await blob.arrayBuffer()
+        );
+
+
+    if (
+        jpeg.length < 2 ||
+        jpeg[0] !==
+            0xFF ||
+        jpeg[1] !==
+            0xD8
+    ) {
+
+        return blob;
+
+    }
+
+
+    const validSegments =
+        segments.filter(
+            segment =>
+                segment &&
+                segment.length >= 4
+        );
+
+
+    if (
+        !validSegments.length
+    ) {
+
+        return blob;
+
+    }
+
+
+    const metadataLength =
+        validSegments.reduce(
+            (
+                total,
+                segment
+            ) =>
+                total +
+                segment.length,
+            0
+        );
+
+
+    const output =
+        new Uint8Array(
+            jpeg.length +
+            metadataLength
+        );
+
+
+    output[0] =
+        jpeg[0];
+
+    output[1] =
+        jpeg[1];
+
+
+    let offset =
+        2;
+
+
+    for (
+        const segment of
+        validSegments
+    ) {
+
+        output.set(
+            segment,
+            offset
+        );
+
+
+        offset +=
+            segment.length;
+
+    }
+
+
+    output.set(
+        jpeg.slice(
+            2
+        ),
+        offset
+    );
+
+
+    return new Blob(
+        [
+            output
+        ],
+        {
+            type:
+                "image/jpeg"
         }
     );
 
