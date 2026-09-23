@@ -1395,8 +1395,8 @@ async function compressToTarget(
         image.naturalHeight;
 
     /*
-     * Si ya cumple el límite, se devuelve el original.
-     * No se recodifica ni se altera un solo píxel.
+     * Si el original ya está por debajo del objetivo,
+     * lo devolvemos sin recodificar.
      */
     if (
         originalFile.size <= targetBytes
@@ -1435,9 +1435,8 @@ async function compressToTarget(
             document.createElement("canvas");
 
         /*
-         * REGLA FIJA:
-         * salida y original tienen exactamente
-         * el mismo ancho y el mismo alto.
+         * La resolución queda bloqueada a la original.
+         * No hay scale, resize ni reducción de píxeles.
          */
         canvas.width = originalWidth;
         canvas.height = originalHeight;
@@ -1469,9 +1468,6 @@ async function compressToTarget(
             );
         }
 
-        /*
-         * No hay resize ni scale.
-         */
         context.drawImage(
             image,
             0,
@@ -1535,15 +1531,18 @@ async function compressToTarget(
         }
 
         /*
-         * 0.80 es el suelo de calidad.
-         * Si no entra, no bajamos resolución para forzarlo.
+         * Igual que en el enfoque anterior:
+         * buscamos la calidad MÁS ALTA que entre en el objetivo.
+         *
+         * El valor del encoder no se interpreta como un
+         * porcentaje de calidad visual.
          */
-        const minimumQuality = 0.80;
-        const maximumQuality = 0.98;
+        const minimumEncoderQuality = 0.10;
+        const maximumEncoderQuality = 0.98;
 
         const minimumCandidate =
             await createCandidate(
-                minimumQuality,
+                minimumEncoderQuality,
                 outputType
             );
 
@@ -1556,7 +1555,7 @@ async function compressToTarget(
 
         const maximumCandidate =
             await createCandidate(
-                maximumQuality,
+                maximumEncoderQuality,
                 outputType
             );
 
@@ -1567,13 +1566,22 @@ async function compressToTarget(
             return maximumCandidate;
         }
 
-        let low = minimumQuality;
-        let high = maximumQuality;
-        let best = minimumCandidate;
+        let low =
+            minimumEncoderQuality;
 
+        let high =
+            maximumEncoderQuality;
+
+        let best =
+            minimumCandidate;
+
+        /*
+         * Búsqueda binaria para acercarnos al límite
+         * sin pasarnos y conservando la máxima calidad.
+         */
         for (
             let attempt = 0;
-            attempt < 16;
+            attempt < 18;
             attempt++
         ) {
             const quality =
@@ -1621,13 +1629,15 @@ async function compressToTarget(
         candidates.length === 0
     ) {
         throw new Error(
-            "No se puede alcanzar ese tamaño manteniendo la resolución original y una calidad visual alta."
+            "No se puede alcanzar ese tamaño manteniendo exactamente la resolución original."
         );
     }
 
     /*
-     * Todos conservan exactamente la misma resolución.
-     * Gana la mayor calidad disponible.
+     * Como todos tienen la misma resolución,
+     * escogemos el candidato con el parámetro de calidad
+     * más alto. En empate, el que aprovecha mejor el
+     * tamaño objetivo.
      */
     candidates.sort(
         (a, b) => {
@@ -1644,7 +1654,7 @@ async function compressToTarget(
             if (
                 Math.abs(
                     qualityB - qualityA
-                ) > 0.005
+                ) > 0.002
             ) {
                 return qualityB - qualityA;
             }
@@ -1655,6 +1665,10 @@ async function compressToTarget(
 
     const best = candidates[0];
 
+    /*
+     * Protección adicional: jamás aceptar un resultado
+     * cuya resolución difiera de la original.
+     */
     if (
         best.width !== originalWidth ||
         best.height !== originalHeight
