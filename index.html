@@ -245,8 +245,9 @@
 
                         <button
                             id="clearSelection"
-                            class="text-button"
+                            class="text-button danger-text-button"
                             type="button"
+                            onclick="resetPhotoShrink()"
                         >
                             Quitar selección
                         </button>
@@ -269,153 +270,18 @@
             <section class="section-card">
 
                 <div class="section-header">
-
                     <div>
-
-                        <h2>
-                            Nivel de compresión
-                        </h2>
-
+                        <h2>Tamaño objetivo</h2>
                         <p>
-                            Elige cómo quieres reducir tus fotos.
+                            Elige el tamaño máximo que quieres para cada foto.
+                            PhotoShrink mantendrá la resolución original.
                         </p>
-
                     </div>
-
                 </div>
 
+                <div id="targetContainer" class="target-container">
 
-                <div class="quality-options">
-
-
-                    <!-- MÁXIMA CALIDAD -->
-
-                    <label class="quality-card">
-
-                        <input
-                            type="radio"
-                            name="quality"
-                            value="maximum"
-                        >
-
-                        <span class="radio"></span>
-
-                        <span class="quality-content">
-
-                            <strong>
-                                Máxima calidad
-                            </strong>
-
-                            <small>
-                                Prioriza mantener la calidad original
-                            </small>
-
-                        </span>
-
-                    </label>
-
-
-                    <!-- EQUILIBRADO -->
-
-                    <label class="quality-card selected">
-
-                        <input
-                            type="radio"
-                            name="quality"
-                            value="balanced"
-                            checked
-                        >
-
-                        <span class="radio"></span>
-
-                        <span class="quality-content">
-
-                            <strong>
-                                Equilibrado
-                            </strong>
-
-                            <small>
-                                Buena calidad con mayor ahorro de espacio
-                            </small>
-
-                        </span>
-
-                    </label>
-
-
-                    <!-- MENOS 1 MB -->
-
-                    <label class="quality-card">
-
-                        <input
-                            type="radio"
-                            name="quality"
-                            value="minus1mb"
-                        >
-
-                        <span class="radio"></span>
-
-                        <span class="quality-content">
-
-                            <strong>
-                                -1 MB
-                            </strong>
-
-                            <small>
-                                Reduce aproximadamente 1 MB por foto
-                            </small>
-
-                        </span>
-
-                    </label>
-
-
-                    <!-- TAMAÑO OBJETIVO -->
-
-                    <label
-                        class="quality-card"
-                        id="targetQualityCard"
-                    >
-
-                        <input
-                            type="radio"
-                            name="quality"
-                            value="target"
-                        >
-
-                        <span class="radio"></span>
-
-                        <span class="quality-content">
-
-                            <strong>
-                                Tamaño objetivo
-                            </strong>
-
-                            <small>
-                                Elige cuánto quieres que pese cada foto
-                            </small>
-
-                        </span>
-
-                    </label>
-
-                </div>
-
-
-                <!-- TAMAÑO OBJETIVO -->
-
-                <div
-                    id="targetContainer"
-                    class="target-container hidden"
-                >
-
-                    <div class="target-divider"></div>
-
-
-                    <h3>
-                        Tamaño máximo por foto
-                    </h3>
-
+                    <h3>Tamaño máximo por foto</h3>
 
                     <div class="target-options">
 
@@ -427,7 +293,6 @@
                             1 MB
                         </button>
 
-
                         <button
                             type="button"
                             class="target-option"
@@ -436,7 +301,6 @@
                             2 MB
                         </button>
 
-
                         <button
                             type="button"
                             class="target-option"
@@ -444,7 +308,6 @@
                         >
                             5 MB
                         </button>
-
 
                         <button
                             type="button"
@@ -456,173 +319,39 @@
 
                     </div>
 
-
                     <div
                         id="customTargetContainer"
                         class="custom-target hidden"
                     >
-
                         <div class="custom-target-input">
 
                             <input
                                 id="targetSize"
                                 type="number"
-                                min="1"
-                                step="1"
+                                min="0.1"
+                                step="0.1"
                                 value="1"
                                 inputmode="decimal"
                             >
 
                             <select
                                 id="targetUnit"
-                                aria-label="Unidad de tamaño"
+                                aria-label="Unidad del tamaño objetivo"
                             >
-
-                                <option value="KB">
-                                    KB
-                                </option>
-
-                                <option
-                                    value="MB"
-                                    selected
-                                >
-                                    MB
-                                </option>
-
+                                <option value="MB" selected>MB</option>
+                                <option value="KB">KB</option>
                             </select>
 
                         </div>
-
                     </div>
-
 
                     <p
                         id="targetDescription"
                         class="target-description"
                     >
-                        Cada foto intentará mantenerse por debajo de 1 MB.
+                        Cada foto intentará mantenerse por debajo de 1 MB
+                        sin cambiar su resolución.
                     </p>
-
-
-                    <!-- VISTA PREVIA -->
-
-                    <div
-                        id="previewSection"
-                        class="target-preview hidden"
-                    >
-
-                        <div class="target-preview-header">
-
-                            <h3>
-                                Vista previa
-                            </h3>
-
-                            <button
-                                id="previewButton"
-                                class="text-button"
-                                type="button"
-                            >
-                                Previsualizar
-                            </button>
-
-                        </div>
-
-
-                        <div
-                            id="previewContent"
-                            class="preview-content hidden"
-                        >
-
-                            <div class="preview-images">
-
-                                <div class="preview-image-card">
-
-                                    <span>
-                                        Original
-                                    </span>
-
-                                    <img
-                                        id="previewOriginal"
-                                        alt="Vista previa original"
-                                    >
-
-                                </div>
-
-
-                                <div class="preview-image-card">
-
-                                    <span>
-                                        Resultado
-                                    </span>
-
-                                    <img
-                                        id="previewResult"
-                                        alt="Vista previa comprimida"
-                                    >
-
-                                </div>
-
-                            </div>
-
-
-                            <div class="preview-info">
-
-                                <div>
-
-                                    <span>
-                                        Tamaño original
-                                    </span>
-
-                                    <strong id="previewOriginalSize">
-                                        -
-                                    </strong>
-
-                                </div>
-
-
-                                <div>
-
-                                    <span>
-                                        Tamaño resultado
-                                    </span>
-
-                                    <strong id="previewResultSize">
-                                        -
-                                    </strong>
-
-                                </div>
-
-
-                                <div>
-
-                                    <span>
-                                        Calidad
-                                    </span>
-
-                                    <strong id="previewQuality">
-                                        -
-                                    </strong>
-
-                                </div>
-
-
-                                <div>
-
-                                    <span>
-                                        Resolución
-                                    </span>
-
-                                    <strong id="previewResolution">
-                                        -
-                                    </strong>
-
-                                </div>
-
-                            </div>
-
-                        </div>
-
-                    </div>
 
                 </div>
 

@@ -1153,12 +1153,6 @@ button {
             0.45
         );
 
-    color: #ffffff;
-
-    font-size: 17px;
-    font-weight: 600;
-    line-height: 1.4;
-
     text-align: center;
 
     opacity: 0;
@@ -1305,4 +1299,25 @@ label,
 a {
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
+}
+
+/* =========================================================
+   TAMAÑO OBJETIVO - UNIDAD PERSONALIZADA
+   ========================================================= */
+
+.custom-target-input select {
+    flex-shrink: 0;
+    min-width: 82px;
+    align-self: stretch;
+    padding: 0 14px;
+    border: 0;
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    outline: none;
+    background: #2c2c2e;
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 600;
+    appearance: none;
+    -webkit-appearance: none;
+    text-align: center;
 }
