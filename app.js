@@ -1376,322 +1376,831 @@ async function compressToTarget(
     originalFile,
     targetBytes,
     originalExif,
-    originalType
+    outputType
 ) {
 
     if (
         !targetBytes ||
         targetBytes <= 0
     ) {
+
         throw new Error(
             "Tamaño objetivo inválido."
         );
+
     }
+
+
+    /*
+     * Si la original ya está dentro del objetivo,
+     * no la recomprimimos.
+     */
+
+    if (
+        originalFile.size <=
+        targetBytes
+    ) {
+
+        const originalResult =
+            new File(
+                [
+                    originalFile
+                ],
+                originalFile.name,
+                {
+                    type:
+                        originalFile.type,
+
+                    lastModified:
+                        originalFile.lastModified
+                }
+            );
+
+
+        originalResult.__photoShrinkQuality =
+            100;
+
+
+        originalResult.__photoShrinkWidth =
+            image.naturalWidth;
+
+
+        originalResult.__photoShrinkHeight =
+            image.naturalHeight;
+
+
+        return originalResult;
+
+    }
+
 
     const originalWidth =
         image.naturalWidth;
 
+
     const originalHeight =
         image.naturalHeight;
 
+
     /*
-     * Si el original ya está por debajo del objetivo,
-     * lo devolvemos sin recodificar.
+     * Calidad mínima: 90 %.
+     * Nunca bajamos de este valor.
      */
-    if (
-        originalFile.size <= targetBytes
-    ) {
-        originalFile.__photoShrinkQuality = 100;
-        originalFile.__photoShrinkWidth = originalWidth;
-        originalFile.__photoShrinkHeight = originalHeight;
-        originalFile.__photoShrinkFormat = originalType;
-        return originalFile;
-    }
 
-    const hasTransparency =
-        imageHasTransparency(image);
+    const minimumQuality =
+        outputType ===
+            "image/png"
+            ? 1
+            : 0.90;
 
-    const webpSupported =
-        await canEncodeImageType("image/webp");
 
-    const outputTypes = [];
-
-    if (webpSupported) {
-        outputTypes.push("image/webp");
-    }
-
-    if (hasTransparency) {
-        outputTypes.push("image/png");
-    } else {
-        outputTypes.push("image/jpeg");
-    }
+    /*
+     * Genera un candidato y añade los metadatos
+     * antes de comprobar su tamaño definitivo.
+     */
 
     async function createCandidate(
-        quality,
-        outputType
+        scale,
+        quality
     ) {
 
-        const canvas =
-            document.createElement("canvas");
+        const width =
+            Math.max(
+                1,
+                Math.round(
+                    originalWidth *
+                    scale
+                )
+            );
 
-        /*
-         * La resolución queda bloqueada a la original.
-         * No hay scale, resize ni reducción de píxeles.
-         */
-        canvas.width = originalWidth;
-        canvas.height = originalHeight;
+
+        const height =
+            Math.max(
+                1,
+                Math.round(
+                    originalHeight *
+                    scale
+                )
+            );
+
+
+        const canvas =
+            document.createElement(
+                "canvas"
+            );
+
+
+        canvas.width =
+            width;
+
+
+        canvas.height =
+            height;
+
 
         const context =
             canvas.getContext(
                 "2d",
                 {
                     alpha:
-                        outputType !== "image/jpeg"
+                        outputType !==
+                        "image/jpeg"
                 }
             );
 
-        if (!context) {
+
+        if (
+            !context
+        ) {
+
             throw new Error(
                 "No se pudo crear el canvas."
             );
+
         }
 
+
         if (
-            outputType === "image/jpeg"
+            outputType ===
+            "image/jpeg"
         ) {
-            context.fillStyle = "#ffffff";
+
+            context.fillStyle =
+                "#ffffff";
+
+
             context.fillRect(
                 0,
                 0,
-                originalWidth,
-                originalHeight
+                width,
+                height
             );
+
         }
+
+
+        context.imageSmoothingEnabled =
+            true;
+
+
+        context.imageSmoothingQuality =
+            "high";
+
 
         context.drawImage(
             image,
             0,
             0,
-            originalWidth,
-            originalHeight
+            width,
+            height
         );
+
 
         let blob =
             await canvasToBlob(
                 canvas,
-                outputType === "image/png"
+                outputType ===
+                    "image/png"
                     ? undefined
                     : quality,
                 outputType
             );
 
+
+        /*
+         * Los metadatos forman parte del tamaño final.
+         */
+
         if (
             preserveMetadata &&
             preserveMetadata.checked &&
-            outputType === "image/jpeg" &&
+            outputType ===
+                "image/jpeg" &&
             originalExif
         ) {
+
             blob =
                 await insertExifIntoJpeg(
                     blob,
                     originalExif
                 );
+
         }
+
 
         return {
+
             blob,
-            width: originalWidth,
-            height: originalHeight,
-            scale: 1,
+
+            width,
+
+            height,
+
             quality:
-                outputType === "image/png"
-                    ? null
+                outputType ===
+                    "image/png"
+                    ? 1
                     : quality,
-            outputType
+
+            scale
+
         };
+
     }
 
-    async function findBestForFormat(
-        outputType
+
+    /*
+     * PNG: la calidad no controla el tamaño.
+     * Solo reducimos resolución.
+     */
+
+    if (
+        outputType ===
+        "image/png"
     ) {
 
-        if (
-            outputType === "image/png"
-        ) {
-            const candidate =
-                await createCandidate(
-                    1,
-                    outputType
-                );
+        let low =
+            0.01;
 
-            return candidate.blob.size <=
-                targetBytes
-                    ? candidate
-                    : null;
-        }
 
-        /*
-         * Igual que en el enfoque anterior:
-         * buscamos la calidad MÁS ALTA que entre en el objetivo.
-         *
-         * El valor del encoder no se interpreta como un
-         * porcentaje de calidad visual.
-         */
-        const minimumEncoderQuality = 0.10;
-        const maximumEncoderQuality = 0.98;
+        let high =
+            1;
+
 
         const minimumCandidate =
             await createCandidate(
-                minimumEncoderQuality,
-                outputType
+                low,
+                1
             );
+
 
         if (
             minimumCandidate.blob.size >
             targetBytes
         ) {
-            return null;
-        }
 
-        const maximumCandidate =
-            await createCandidate(
-                maximumEncoderQuality,
-                outputType
+            throw new Error(
+                "El tamaño objetivo es demasiado pequeño para esta imagen."
             );
 
-        if (
-            maximumCandidate.blob.size <=
-            targetBytes
-        ) {
-            return maximumCandidate;
         }
 
-        let low =
-            minimumEncoderQuality;
-
-        let high =
-            maximumEncoderQuality;
 
         let best =
             minimumCandidate;
 
-        /*
-         * Búsqueda binaria para acercarnos al límite
-         * sin pasarnos y conservando la máxima calidad.
-         */
+
         for (
             let attempt = 0;
             attempt < 18;
             attempt++
         ) {
-            const quality =
-                (low + high) / 2;
+
+            const scale =
+                (
+                    low +
+                    high
+                ) /
+                2;
+
 
             const candidate =
                 await createCandidate(
-                    quality,
-                    outputType
+                    scale,
+                    1
                 );
+
 
             if (
                 candidate.blob.size <=
                 targetBytes
             ) {
-                best = candidate;
-                low = quality;
+
+                best =
+                    candidate;
+
+
+                low =
+                    scale;
+
             } else {
-                high = quality;
+
+                high =
+                    scale;
+
             }
+
         }
 
-        return best;
+
+        return createCompressedTargetFile(
+            best,
+            originalFile,
+            targetBytes,
+            outputType
+        );
+
     }
 
-    const candidates = [];
+
+    /*
+     * JPEG / WEBP
+     *
+     * Buscamos la combinación que conserve mejor
+     * la imagen visualmente sin superar el objetivo.
+     *
+     * La resolución tiene prioridad sobre bajar
+     * la calidad por debajo del 90 %, que está prohibido.
+     */
+
+    const scaleCandidates = [
+
+        1.00,
+        0.975,
+        0.95,
+        0.925,
+        0.90,
+        0.875,
+        0.85,
+        0.825,
+        0.80,
+        0.775,
+        0.75,
+        0.725,
+        0.70,
+        0.675,
+        0.65,
+        0.625,
+        0.60,
+        0.575,
+        0.55,
+        0.525,
+        0.50,
+        0.475,
+        0.45,
+        0.425,
+        0.40,
+        0.375,
+        0.35,
+        0.325,
+        0.30,
+        0.275,
+        0.25,
+        0.225,
+        0.20,
+        0.175,
+        0.15,
+        0.125,
+        0.10,
+        0.075,
+        0.05,
+        0.025,
+        0.01
+
+    ];
+
+
+    const qualityCandidates = [
+
+        1.00,
+        0.99,
+        0.98,
+        0.97,
+        0.96,
+        0.95,
+        0.94,
+        0.93,
+        0.92,
+        0.91,
+        0.90
+
+    ];
+
+
+    let best =
+        null;
+
+
+    /*
+     * Primero comprobamos si existe una solución
+     * manteniendo la resolución original.
+     */
 
     for (
-        const outputType of outputTypes
+        const quality of
+        qualityCandidates
     ) {
+
         const candidate =
-            await findBestForFormat(
-                outputType
+            await createCandidate(
+                1,
+                quality
             );
 
+
         if (
-            candidate &&
-            candidate.blob.size <= targetBytes
+            candidate.blob.size <=
+            targetBytes
         ) {
-            candidates.push(candidate);
+
+            best =
+                candidate;
+
+            break;
+
         }
+
     }
 
-    if (
-        candidates.length === 0
-    ) {
-        throw new Error(
-            "No se puede alcanzar ese tamaño manteniendo exactamente la resolución original."
-        );
-    }
 
     /*
-     * Como todos tienen la misma resolución,
-     * escogemos el candidato con el parámetro de calidad
-     * más alto. En empate, el que aprovecha mejor el
-     * tamaño objetivo.
+     * Si la resolución original no entra,
+     * buscamos la MAYOR resolución posible
+     * que permita una calidad de al menos 90 %.
+     *
+     * Para cada resolución buscamos después
+     * la mayor calidad posible.
      */
-    candidates.sort(
-        (a, b) => {
-            const qualityA =
-                a.quality === null
-                    ? 1
-                    : a.quality;
 
-            const qualityB =
-                b.quality === null
-                    ? 1
-                    : b.quality;
+    if (
+        !best
+    ) {
+
+        let lowScale =
+            0.01;
+
+
+        let highScale =
+            1;
+
+
+        /*
+         * Comprobamos primero que una resolución
+         * mínima sea suficiente.
+         */
+
+        const minimumCandidate =
+            await createCandidate(
+                0.01,
+                minimumQuality
+            );
+
+
+        if (
+            minimumCandidate.blob.size >
+            targetBytes
+        ) {
+
+            throw new Error(
+                "El tamaño objetivo es demasiado pequeño para esta imagen."
+            );
+
+        }
+
+
+        best =
+            minimumCandidate;
+
+
+        /*
+         * Búsqueda binaria de resolución.
+         *
+         * En cada punto usamos 90 % para saber
+         * si esa resolución cabe.
+         */
+
+        for (
+            let attempt = 0;
+            attempt < 18;
+            attempt++
+        ) {
+
+            const scale =
+                (
+                    lowScale +
+                    highScale
+                ) /
+                2;
+
+
+            const candidate =
+                await createCandidate(
+                    scale,
+                    minimumQuality
+                );
+
 
             if (
-                Math.abs(
-                    qualityB - qualityA
-                ) > 0.002
+                candidate.blob.size <=
+                targetBytes
             ) {
-                return qualityB - qualityA;
+
+                best =
+                    candidate;
+
+
+                lowScale =
+                    scale;
+
+            } else {
+
+                highScale =
+                    scale;
+
             }
 
-            return b.blob.size - a.blob.size;
         }
-    );
 
-    const best = candidates[0];
+
+        /*
+         * Ahora tenemos la mayor resolución posible
+         * aproximadamente.
+         *
+         * Buscamos la calidad máxima que entre.
+         */
+
+        let lowQuality =
+            minimumQuality;
+
+
+        let highQuality =
+            1;
+
+
+        const resolution =
+            lowScale;
+
+
+        const baseCandidate =
+            await createCandidate(
+                resolution,
+                minimumQuality
+            );
+
+
+        if (
+            baseCandidate.blob.size <=
+            targetBytes
+        ) {
+
+            best =
+                baseCandidate;
+
+        }
+
+
+        for (
+            let attempt = 0;
+            attempt < 18;
+            attempt++
+        ) {
+
+            const quality =
+                (
+                    lowQuality +
+                    highQuality
+                ) /
+                2;
+
+
+            const candidate =
+                await createCandidate(
+                    resolution,
+                    quality
+                );
+
+
+            if (
+                candidate.blob.size <=
+                targetBytes
+            ) {
+
+                best =
+                    candidate;
+
+
+                lowQuality =
+                    quality;
+
+            } else {
+
+                highQuality =
+                    quality;
+
+            }
+
+        }
+
+    }
+
 
     /*
-     * Protección adicional: jamás aceptar un resultado
-     * cuya resolución difiera de la original.
+     * Búsqueda fina alrededor de la mejor resolución.
+     *
+     * Sirve para aprovechar los últimos KB sin
+     * sacrificar resolución innecesariamente.
      */
-    if (
-        best.width !== originalWidth ||
-        best.height !== originalHeight
-    ) {
-        throw new Error(
-            "La resolución del resultado no coincide con la original."
+
+    const bestScale =
+        best.scale;
+
+
+    const fineScales = [
+
+        bestScale * 1.025,
+        bestScale * 1.015,
+        bestScale * 1.005,
+        bestScale,
+        bestScale * 0.995,
+        bestScale * 0.985,
+        bestScale * 0.975
+
+    ]
+        .filter(
+            scale =>
+                scale > 0 &&
+                scale <= 1
         );
+
+
+    for (
+        const scale of
+        fineScales
+    ) {
+
+        let lowQuality =
+            minimumQuality;
+
+
+        let highQuality =
+            1;
+
+
+        /*
+         * Primero comprobamos 100 %.
+         * Si entra, es automáticamente preferible
+         * a bajar calidad.
+         */
+
+        const maximumCandidate =
+            await createCandidate(
+                scale,
+                1
+            );
+
+
+        if (
+            maximumCandidate.blob.size <=
+            targetBytes
+        ) {
+
+            if (
+                scale >=
+                best.scale
+            ) {
+
+                best =
+                    maximumCandidate;
+
+            }
+
+            continue;
+
+        }
+
+
+        /*
+         * Si 100 % no entra, buscamos la máxima
+         * calidad posible sin bajar de 90 %.
+         */
+
+        const minimumCandidate =
+            await createCandidate(
+                scale,
+                minimumQuality
+            );
+
+
+        if (
+            minimumCandidate.blob.size >
+            targetBytes
+        ) {
+
+            continue;
+
+        }
+
+
+        let fineBest =
+            minimumCandidate;
+
+
+        for (
+            let attempt = 0;
+            attempt < 14;
+            attempt++
+        ) {
+
+            const quality =
+                (
+                    lowQuality +
+                    highQuality
+                ) /
+                2;
+
+
+            const candidate =
+                await createCandidate(
+                    scale,
+                    quality
+                );
+
+
+            if (
+                candidate.blob.size <=
+                targetBytes
+            ) {
+
+                fineBest =
+                    candidate;
+
+
+                lowQuality =
+                    quality;
+
+            } else {
+
+                highQuality =
+                    quality;
+
+            }
+
+        }
+
+
+        /*
+         * Elegimos primero la resolución más alta.
+         * Si la resolución es prácticamente igual,
+         * elegimos la mayor calidad.
+         */
+
+        const currentPixelCount =
+            best.width *
+            best.height;
+
+
+        const candidatePixelCount =
+            fineBest.width *
+            fineBest.height;
+
+
+        if (
+            candidatePixelCount >
+            currentPixelCount
+        ) {
+
+            best =
+                fineBest;
+
+        } else if (
+            candidatePixelCount ===
+            currentPixelCount &&
+            fineBest.quality >
+            best.quality
+        ) {
+
+            best =
+                fineBest;
+
+        }
+
     }
 
+
+    /*
+     * Garantía final.
+     */
+
     if (
-        best.blob.size > targetBytes
+        !best ||
+        best.blob.size >
+            targetBytes
     ) {
+
         throw new Error(
-            "El resultado supera el tamaño objetivo."
+            "No se pudo alcanzar el tamaño objetivo sin superarlo."
         );
+
     }
+
 
     return createCompressedTargetFile(
         best,
         originalFile,
         targetBytes,
-        best.outputType
+        outputType
     );
+
 }
 
 
