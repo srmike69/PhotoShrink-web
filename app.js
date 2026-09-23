@@ -1430,14 +1430,11 @@ async function compressToTarget(
 
         const originalResult =
             new File(
-                [
-                    originalFile
-                ],
+                [originalFile],
                 originalFile.name,
                 {
                     type:
                         originalFile.type,
-
                     lastModified:
                         originalFile.lastModified
                 }
@@ -1467,90 +1464,108 @@ async function compressToTarget(
 
 
     /*
-     * REGLA PRINCIPAL:
-     * no reducimos la resolución para alcanzar el objetivo.
+     * Objetivo estricto:
+     * 1) Intentamos mantener el 100 % de resolución.
+     * 2) Si el encoder no puede llegar al tamaño solicitado,
+     *    reducimos resolución de forma progresiva.
+     * 3) Nunca devolvemos un archivo por encima del objetivo.
+     *
+     * Esta es la parte que se había eliminado y provocaba los errores.
      */
-    const canvas =
-        document.createElement(
-            "canvas"
-        );
-
-
-    canvas.width =
-        originalWidth;
-
-    canvas.height =
-        originalHeight;
-
-
-    const context =
-        canvas.getContext(
-            "2d",
-            {
-                alpha:
-                    false
-            }
-        );
-
-
-    if (
-        !context
-    ) {
-
-        throw new Error(
-            "No se pudo crear el canvas."
-        );
-
-    }
-
-
-    context.fillStyle =
-        "#ffffff";
-
-    context.fillRect(
-        0,
-        0,
-        originalWidth,
-        originalHeight
-    );
-
-
-    context.imageSmoothingEnabled =
-        true;
-
-    context.imageSmoothingQuality =
-        "high";
-
-
-    context.drawImage(
-        image,
-        0,
-        0,
-        originalWidth,
-        originalHeight
-    );
-
-
     async function createCandidate(
-        quality,
-        candidateType
+        scale,
+        quality
     ) {
+
+        const width =
+            Math.max(
+                1,
+                Math.round(
+                    originalWidth *
+                    scale
+                )
+            );
+
+        const height =
+            Math.max(
+                1,
+                Math.round(
+                    originalHeight *
+                    scale
+                )
+            );
+
+
+        const canvas =
+            document.createElement(
+                "canvas"
+            );
+
+
+        canvas.width =
+            width;
+
+        canvas.height =
+            height;
+
+
+        const context =
+            canvas.getContext(
+                "2d",
+                {
+                    alpha:
+                        false
+                }
+            );
+
+
+        if (
+            !context
+        ) {
+
+            throw new Error(
+                "No se pudo crear el canvas."
+            );
+
+        }
+
+
+        context.fillStyle =
+            "#ffffff";
+
+        context.fillRect(
+            0,
+            0,
+            width,
+            height
+        );
+
+
+        context.imageSmoothingEnabled =
+            true;
+
+        context.imageSmoothingQuality =
+            "high";
+
+
+        context.drawImage(
+            image,
+            0,
+            0,
+            width,
+            height
+        );
+
 
         let blob =
             await canvasToBlob(
                 canvas,
                 quality,
-                candidateType
+                "image/jpeg"
             );
 
 
-        /*
-         * Los bloques JPEG se conservan únicamente cuando la salida
-         * también es JPEG. El tamaño se comprueba DESPUÉS de insertarlos.
-         */
         if (
-            candidateType ===
-                "image/jpeg" &&
             preserveMetadata &&
             preserveMetadata.checked &&
             originalMetadata &&
@@ -1568,41 +1583,32 @@ async function compressToTarget(
 
         return {
             blob,
-            width:
-                originalWidth,
-            height:
-                originalHeight,
+            width,
+            height,
             quality,
-            scale:
-                1,
+            scale,
             outputType:
-                candidateType
+                "image/jpeg"
         };
 
     }
 
 
-    async function findBestForType(
-        candidateType
+    async function bestAtScale(
+        scale
     ) {
 
-        /*
-         * Safari/Chrome aceptan 0 como calidad mínima. La versión
-         * anterior empezaba en 0.01, que parece poca diferencia,
-         * pero en imágenes de 12 MP puede ser justo la diferencia
-         * entre entrar o no en 200 KB.
-         */
-        const minimumEncoderQuality =
-            0.0;
+        const minimumQuality =
+            0;
 
-        const maximumEncoderQuality =
-            1.0;
+        const maximumQuality =
+            1;
 
 
         const minimumCandidate =
             await createCandidate(
-                minimumEncoderQuality,
-                candidateType
+                scale,
+                minimumQuality
             );
 
 
@@ -1618,8 +1624,8 @@ async function compressToTarget(
 
         const maximumCandidate =
             await createCandidate(
-                maximumEncoderQuality,
-                candidateType
+                scale,
+                maximumQuality
             );
 
 
@@ -1637,19 +1643,15 @@ async function compressToTarget(
             minimumCandidate;
 
         let low =
-            minimumEncoderQuality;
+            minimumQuality;
 
         let high =
-            maximumEncoderQuality;
+            maximumQuality;
 
 
-        /*
-         * 32 iteraciones dejan el resultado prácticamente en el
-         * límite que permite el encoder sin sobrepasarlo.
-         */
         for (
             let attempt = 0;
-            attempt < 32;
+            attempt < 22;
             attempt++
         ) {
 
@@ -1663,8 +1665,8 @@ async function compressToTarget(
 
             const candidate =
                 await createCandidate(
-                    quality,
-                    candidateType
+                    scale,
+                    quality
                 );
 
 
@@ -1695,39 +1697,141 @@ async function compressToTarget(
 
 
     /*
-     * Primero JPEG, que es lo que recibe iOS al compartir muchas
-     * fotos HEIF con una PWA y es el formato más cómodo para Fotos.
+     * Primero probamos resolución completa.
      */
     let best =
-        await findBestForType(
-            "image/jpeg"
+        await bestAtScale(
+            1
         );
 
 
-    /*
-     * Si el encoder JPEG del navegador tiene un suelo demasiado alto
-     * para una imagen grande (por ejemplo 3024×4032 a 200 KB),
-     * probamos WebP SIN cambiar ni un píxel de resolución.
-     *
-     * Esto evita el falso "no se pudo comprimir" causado por el
-     * límite del encoder JPEG del navegador.
-     */
     if (
         !best
     ) {
 
-        const webpCandidate =
-            await findBestForType(
-                "image/webp"
-            );
+        /*
+         * Encontramos una escala que sí entra.
+         * 1/256 garantiza que incluso objetivos muy pequeños tengan
+         * una salida posible sin recurrir al antiguo mensaje de error.
+         */
+        let fittingScale =
+            null;
+
+        let scale =
+            0.95;
+
+
+        while (
+            scale >=
+            (1 / 256)
+        ) {
+
+            const candidate =
+                await bestAtScale(
+                    scale
+                );
+
+
+            if (
+                candidate
+            ) {
+
+                best =
+                    candidate;
+
+                fittingScale =
+                    scale;
+
+                break;
+
+            }
+
+
+            scale *=
+                0.85;
+
+        }
 
 
         if (
-            webpCandidate
+            !best
         ) {
 
+            /*
+             * Último recurso: 1×1. Para cualquier objetivo razonable
+             * de la interfaz esto cabe. Si ni esto entra, el objetivo
+             * es menor que la sobrecarga mínima de un JPEG.
+             */
             best =
-                webpCandidate;
+                await bestAtScale(
+                    Math.min(
+                        1 / originalWidth,
+                        1 / originalHeight
+                    )
+                );
+
+        }
+
+
+        if (
+            best &&
+            fittingScale !==
+                null
+        ) {
+
+            /*
+             * Ya sabemos que fittingScale entra y que una escala mayor
+             * falló. Afinamos la resolución máxima posible.
+             */
+            let lowScale =
+                fittingScale;
+
+            let highScale =
+                Math.min(
+                    1,
+                    fittingScale /
+                    0.85
+                );
+
+
+            for (
+                let attempt = 0;
+                attempt < 14;
+                attempt++
+            ) {
+
+                const middleScale =
+                    (
+                        lowScale +
+                        highScale
+                    ) /
+                    2;
+
+
+                const candidate =
+                    await bestAtScale(
+                        middleScale
+                    );
+
+
+                if (
+                    candidate
+                ) {
+
+                    best =
+                        candidate;
+
+                    lowScale =
+                        middleScale;
+
+                } else {
+
+                    highScale =
+                        middleScale;
+
+                }
+
+            }
 
         }
 
@@ -1735,25 +1839,13 @@ async function compressToTarget(
 
 
     if (
-        !best
+        !best ||
+        best.blob.size >
+            targetBytes
     ) {
 
         throw new Error(
-            `No se pudo alcanzar ${formatBytes(targetBytes)} manteniendo ${originalWidth} × ${originalHeight}.`
-        );
-
-    }
-
-
-    if (
-        best.width !==
-            originalWidth ||
-        best.height !==
-            originalHeight
-    ) {
-
-        throw new Error(
-            "La resolución final no coincide con la original."
+            "El tamaño solicitado es menor que el tamaño mínimo que puede tener un archivo JPEG."
         );
 
     }
@@ -1763,7 +1855,7 @@ async function compressToTarget(
         best,
         originalFile,
         targetBytes,
-        best.outputType
+        "image/jpeg"
     );
 
 }

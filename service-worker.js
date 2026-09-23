@@ -1,4 +1,4 @@
-const CACHE_NAME = "photoshrink-v5-200kb-fix";
+const CACHE_NAME = "photoshrink-v6-strict-target";
 
 const APP_SHELL = [
     "./",
