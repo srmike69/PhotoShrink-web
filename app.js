@@ -960,7 +960,10 @@ async function compressImage(
 ) {
 
     if (
-        !file.type.startsWith("image/")
+        !file.type.startsWith("image/") &&
+        !isHeicFile(
+            file
+        )
     ) {
 
         return file;
@@ -1876,12 +1879,23 @@ async function extractPortableMetadata(
         }
 
 
-        /*
-         * HEIC/HEIF: Safari puede decodificar la imagen, pero el navegador
-         * no expone de forma uniforme sus metadatos ISO-BMFF a JavaScript.
-         * Conservamos al menos lastModified en el File final. No fabricamos
-         * EXIF inexistente.
-         */
+        if (
+            originalType ===
+                "image/heic" ||
+            originalType ===
+                "image/heif" ||
+            isHeicFile(
+                file
+            )
+        ) {
+
+            return extractHeifPortableMetadata(
+                bytes
+            );
+
+        }
+
+
         return [];
 
     } catch (
@@ -1897,6 +1911,158 @@ async function extractPortableMetadata(
         return [];
 
     }
+
+}
+
+
+function extractHeifPortableMetadata(
+    bytes
+) {
+
+    const segments =
+        [];
+
+
+    /*
+     * HEIF es un contenedor ISO-BMFF. En una PWA sin backend no existe
+     * una API web estándar que entregue todos sus items de metadatos.
+     * Buscamos EXIF/XMP embebidos que puedan transportarse legalmente
+     * al JPEG final.
+     */
+    const exifSignature =
+        new Uint8Array([
+            0x45,
+            0x78,
+            0x69,
+            0x66,
+            0x00,
+            0x00
+        ]);
+
+
+    for (
+        let i = 0;
+        i <=
+            bytes.length -
+            exifSignature.length;
+        i++
+    ) {
+
+        let matches =
+            true;
+
+
+        for (
+            let j = 0;
+            j <
+                exifSignature.length;
+            j++
+        ) {
+
+            if (
+                bytes[i + j] !==
+                exifSignature[j]
+            ) {
+
+                matches =
+                    false;
+
+                break;
+
+            }
+
+        }
+
+
+        if (
+            matches
+        ) {
+
+            /*
+             * El tamaño exacto del item HEIF requiere interpretar iloc/iinf.
+             * Para evitar fabricar un APP1 corrupto, solo conservamos EXIF
+             * cuando podemos reconocer un TIFF válido inmediatamente después.
+             */
+            const tiffStart =
+                i +
+                6;
+
+
+            const littleEndian =
+                bytes[tiffStart] ===
+                    0x49 &&
+                bytes[tiffStart + 1] ===
+                    0x49 &&
+                bytes[tiffStart + 2] ===
+                    0x2A &&
+                bytes[tiffStart + 3] ===
+                    0x00;
+
+
+            const bigEndian =
+                bytes[tiffStart] ===
+                    0x4D &&
+                bytes[tiffStart + 1] ===
+                    0x4D &&
+                bytes[tiffStart + 2] ===
+                    0x00 &&
+                bytes[tiffStart + 3] ===
+                    0x2A;
+
+
+            if (
+                littleEndian ||
+                bigEndian
+            ) {
+
+                /*
+                 * APP1 admite como máximo 65533 bytes de payload.
+                 * Copiamos hasta ese límite; insertMetadataIntoJpeg
+                 * vuelve a validar el segmento.
+                 */
+                const end =
+                    Math.min(
+                        bytes.length,
+                        i +
+                            65531
+                    );
+
+
+                const payload =
+                    bytes.slice(
+                        i,
+                        end
+                    );
+
+
+                const segment =
+                    createJpegAppSegment(
+                        0xE1,
+                        payload
+                    );
+
+
+                if (
+                    segment
+                ) {
+
+                    segments.push(
+                        segment
+                    );
+
+                }
+
+            }
+
+
+            break;
+
+        }
+
+    }
+
+
+    return segments;
 
 }
 
@@ -2922,7 +3088,41 @@ function getExtensionForType(
    CARGAR IMAGEN
    ========================================================= */
 
-function loadImage(
+async function loadImage(
+    file
+) {
+
+    /*
+     * HEIC/HEIF necesita un decodificador real en navegador.
+     * No dependemos de que Safari/Chrome sepan mostrarlo mediante <img>.
+     */
+    if (
+        isHeicFile(
+            file
+        )
+    ) {
+
+        const convertedBlob =
+            await decodeHeicForProcessing(
+                file
+            );
+
+
+        return loadStandardImage(
+            convertedBlob
+        );
+
+    }
+
+
+    return loadStandardImage(
+        file
+    );
+
+}
+
+
+function loadStandardImage(
     file
 ) {
 
@@ -2967,7 +3167,7 @@ function loadImage(
 
                     reject(
                         new Error(
-                            "No se pudo cargar la imagen."
+                            "No se pudo leer la imagen."
                         )
                     );
 
@@ -2979,6 +3179,117 @@ function loadImage(
 
         }
     );
+
+}
+
+
+async function decodeHeicForProcessing(
+    file
+) {
+
+    const decoder =
+        window.HeicTo;
+
+
+    if (
+        !decoder
+    ) {
+
+        throw new Error(
+            "No se pudo cargar el decodificador HEIC/HEIF. Comprueba la conexión y vuelve a abrir PhotoShrink."
+        );
+
+    }
+
+
+    try {
+
+        let converted;
+
+
+        /*
+         * heic-to IIFE expone la conversión como función global.
+         * También aceptamos heicTo por compatibilidad con otras builds.
+         */
+        if (
+            typeof decoder ===
+            "function"
+        ) {
+
+            converted =
+                await decoder({
+                    blob:
+                        file,
+                    type:
+                        "image/jpeg",
+                    quality:
+                        1
+                });
+
+        } else if (
+            typeof decoder.heicTo ===
+            "function"
+        ) {
+
+            converted =
+                await decoder.heicTo({
+                    blob:
+                        file,
+                    type:
+                        "image/jpeg",
+                    quality:
+                        1
+                });
+
+        } else {
+
+            throw new Error(
+                "El decodificador HEIC/HEIF no expone una función compatible."
+            );
+
+        }
+
+
+        if (
+            Array.isArray(
+                converted
+            )
+        ) {
+
+            converted =
+                converted[0];
+
+        }
+
+
+        if (
+            !(converted instanceof Blob)
+        ) {
+
+            throw new Error(
+                "La conversión HEIC/HEIF no devolvió una imagen válida."
+            );
+
+        }
+
+
+        return converted;
+
+    } catch (
+        error
+    ) {
+
+        console.error(
+            "Error decodificando HEIC/HEIF:",
+            error
+        );
+
+
+        throw new Error(
+            "No se pudo decodificar esta imagen HEIC/HEIF."
+        );
+
+    }
 
 }
 
