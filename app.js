@@ -886,6 +886,7 @@ compressButton.addEventListener(
                 ) {
 
                     alert(
+                        error.message ||
                         `No se pudo comprimir "${file.name}" sin superar el tamaño objetivo.`
                     );
 
@@ -1466,7 +1467,8 @@ async function compressToTarget(
 
 
     /*
-     * La resolución NO se modifica.
+     * REGLA PRINCIPAL:
+     * no reducimos la resolución para alcanzar el objetivo.
      */
     const canvas =
         document.createElement(
@@ -1502,9 +1504,6 @@ async function compressToTarget(
     }
 
 
-    /*
-     * JPEG no admite transparencia.
-     */
     context.fillStyle =
         "#ffffff";
 
@@ -1533,22 +1532,25 @@ async function compressToTarget(
 
 
     async function createCandidate(
-        quality
+        quality,
+        candidateType
     ) {
 
         let blob =
             await canvasToBlob(
                 canvas,
                 quality,
-                outputType
+                candidateType
             );
 
 
         /*
-         * Los metadatos se insertan antes de comprobar el tamaño,
-         * para que el límite solicitado corresponda al archivo REAL.
+         * Los bloques JPEG se conservan únicamente cuando la salida
+         * también es JPEG. El tamaño se comprueba DESPUÉS de insertarlos.
          */
         if (
+            candidateType ===
+                "image/jpeg" &&
             preserveMetadata &&
             preserveMetadata.checked &&
             originalMetadata &&
@@ -1572,74 +1574,82 @@ async function compressToTarget(
                 originalHeight,
             quality,
             scale:
-                1
+                1,
+            outputType:
+                candidateType
         };
 
     }
 
 
-    /*
-     * Buscamos la calidad de codificación más alta que entre.
-     * El valor del encoder NO equivale a un porcentaje visual.
-     */
-    const minimumEncoderQuality =
-        0.01;
-
-    const maximumEncoderQuality =
-        1.00;
-
-
-    const minimumCandidate =
-        await createCandidate(
-            minimumEncoderQuality
-        );
-
-
-    if (
-        minimumCandidate.blob.size >
-        targetBytes
+    async function findBestForType(
+        candidateType
     ) {
-
-        throw new Error(
-            "El tamaño objetivo es menor que el mínimo posible manteniendo la resolución y los metadatos."
-        );
-
-    }
-
-
-    let best =
-        minimumCandidate;
-
-    let low =
-        minimumEncoderQuality;
-
-    let high =
-        maximumEncoderQuality;
-
-
-    const maximumCandidate =
-        await createCandidate(
-            maximumEncoderQuality
-        );
-
-
-    if (
-        maximumCandidate.blob.size <=
-        targetBytes
-    ) {
-
-        best =
-            maximumCandidate;
-
-    } else {
 
         /*
-         * Búsqueda binaria de la mayor calidad que no supere
-         * el tamaño solicitado.
+         * Safari/Chrome aceptan 0 como calidad mínima. La versión
+         * anterior empezaba en 0.01, que parece poca diferencia,
+         * pero en imágenes de 12 MP puede ser justo la diferencia
+         * entre entrar o no en 200 KB.
+         */
+        const minimumEncoderQuality =
+            0.0;
+
+        const maximumEncoderQuality =
+            1.0;
+
+
+        const minimumCandidate =
+            await createCandidate(
+                minimumEncoderQuality,
+                candidateType
+            );
+
+
+        if (
+            minimumCandidate.blob.size >
+            targetBytes
+        ) {
+
+            return null;
+
+        }
+
+
+        const maximumCandidate =
+            await createCandidate(
+                maximumEncoderQuality,
+                candidateType
+            );
+
+
+        if (
+            maximumCandidate.blob.size <=
+            targetBytes
+        ) {
+
+            return maximumCandidate;
+
+        }
+
+
+        let best =
+            minimumCandidate;
+
+        let low =
+            minimumEncoderQuality;
+
+        let high =
+            maximumEncoderQuality;
+
+
+        /*
+         * 32 iteraciones dejan el resultado prácticamente en el
+         * límite que permite el encoder sin sobrepasarlo.
          */
         for (
             let attempt = 0;
-            attempt < 24;
+            attempt < 32;
             attempt++
         ) {
 
@@ -1653,7 +1663,8 @@ async function compressToTarget(
 
             const candidate =
                 await createCandidate(
-                    quality
+                    quality,
+                    candidateType
                 );
 
 
@@ -1677,6 +1688,60 @@ async function compressToTarget(
 
         }
 
+
+        return best;
+
+    }
+
+
+    /*
+     * Primero JPEG, que es lo que recibe iOS al compartir muchas
+     * fotos HEIF con una PWA y es el formato más cómodo para Fotos.
+     */
+    let best =
+        await findBestForType(
+            "image/jpeg"
+        );
+
+
+    /*
+     * Si el encoder JPEG del navegador tiene un suelo demasiado alto
+     * para una imagen grande (por ejemplo 3024×4032 a 200 KB),
+     * probamos WebP SIN cambiar ni un píxel de resolución.
+     *
+     * Esto evita el falso "no se pudo comprimir" causado por el
+     * límite del encoder JPEG del navegador.
+     */
+    if (
+        !best
+    ) {
+
+        const webpCandidate =
+            await findBestForType(
+                "image/webp"
+            );
+
+
+        if (
+            webpCandidate
+        ) {
+
+            best =
+                webpCandidate;
+
+        }
+
+    }
+
+
+    if (
+        !best
+    ) {
+
+        throw new Error(
+            `No se pudo alcanzar ${formatBytes(targetBytes)} manteniendo ${originalWidth} × ${originalHeight}.`
+        );
+
     }
 
 
@@ -1698,7 +1763,7 @@ async function compressToTarget(
         best,
         originalFile,
         targetBytes,
-        outputType
+        best.outputType
     );
 
 }

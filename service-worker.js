@@ -1,6 +1,8 @@
-const CACHE_NAME = "photoshrink-v2";
+const CACHE_NAME = "photoshrink-v5-200kb-fix";
 
-const STATIC_FILES = [
+const APP_SHELL = [
+    "./",
+    "./index.html",
     "./styles.css",
     "./app.js",
     "./manifest.json",
@@ -10,176 +12,63 @@ const STATIC_FILES = [
     "./icons/apple-touch-icon.png"
 ];
 
+self.addEventListener("install", event => {
+    self.skipWaiting();
 
-/* =========================================================
-   INSTALL
-   ========================================================= */
+    event.waitUntil(
+        caches.open(CACHE_NAME)
+            .then(cache => cache.addAll(APP_SHELL))
+    );
+});
 
-self.addEventListener(
-    "install",
-    event => {
-
-        event.waitUntil(
-            caches
-                .open(CACHE_NAME)
-                .then(
-                    cache =>
-                        cache.addAll(
-                            STATIC_FILES
-                        )
+self.addEventListener("activate", event => {
+    event.waitUntil(
+        Promise.all([
+            caches.keys().then(keys =>
+                Promise.all(
+                    keys
+                        .filter(key => key !== CACHE_NAME)
+                        .map(key => caches.delete(key))
                 )
-        );
+            ),
+            self.clients.claim()
+        ])
+    );
+});
 
-        self.skipWaiting();
+self.addEventListener("fetch", event => {
+    const request = event.request;
 
+    if (request.method !== "GET") {
+        return;
     }
-);
 
+    const url = new URL(request.url);
 
-/* =========================================================
-   ACTIVATE
-   ========================================================= */
-
-self.addEventListener(
-    "activate",
-    event => {
-
-        event.waitUntil(
-
-            caches
-                .keys()
-                .then(
-                    keys =>
-                        Promise.all(
-                            keys
-                                .filter(
-                                    key =>
-                                        key !== CACHE_NAME
-                                )
-                                .map(
-                                    key =>
-                                        caches.delete(key)
-                                )
-                        )
-                )
-                .then(
-                    () =>
-                        self.clients.claim()
-                )
-
-        );
-
-    }
-);
-
-
-/* =========================================================
-   FETCH
-   ========================================================= */
-
-self.addEventListener(
-    "fetch",
-    event => {
-
-        const request =
-            event.request;
-
-
-        /*
-         * Para navegaciones HTML NO devolvemos
-         * una respuesta cacheada.
-         *
-         * Safari iOS puede rechazar respuestas
-         * cacheadas que originalmente pasaron
-         * por una redirección.
-         */
-
-        if (
-            request.mode === "navigate"
-        ) {
-
-            event.respondWith(
-                fetch(request).catch(
-                    () =>
-                        caches.match(
-                            "./index.html"
-                        )
-                )
-            );
-
-            return;
-
-        }
-
-
-        /*
-         * Para CSS, JS, manifest e iconos:
-         * caché primero, red después.
-         */
-
+    // Los archivos de la app se actualizan desde red y se guardan en caché.
+    if (url.origin === self.location.origin) {
         event.respondWith(
-
-            caches
-                .match(request)
-                .then(
-                    cachedResponse => {
-
-                        if (
-                            cachedResponse
-                        ) {
-
-                            return cachedResponse;
-
-                        }
-
-
-                        return fetch(request)
-                            .then(
-                                response => {
-
-                                    /*
-                                     * No almacenamos respuestas
-                                     * redirigidas.
-                                     */
-
-                                    if (
-                                        !response ||
-                                        response.status !== 200 ||
-                                        response.redirected
-                                    ) {
-
-                                        return response;
-
-                                    }
-
-
-                                    const responseClone =
-                                        response.clone();
-
-
-                                    caches
-                                        .open(CACHE_NAME)
-                                        .then(
-                                            cache => {
-
-                                                cache.put(
-                                                    request,
-                                                    responseClone
-                                                );
-
-                                            }
-                                        );
-
-
-                                    return response;
-
-                                }
-                            );
-
-                    }
-                )
-
+            fetch(request)
+                .then(response => {
+                    const copy = response.clone();
+                    caches.open(CACHE_NAME)
+                        .then(cache => cache.put(request, copy));
+                    return response;
+                })
+                .catch(() => caches.match(request))
         );
-
+        return;
     }
-);
+
+    // Dependencias externas: red con fallback a caché.
+    event.respondWith(
+        fetch(request)
+            .then(response => {
+                const copy = response.clone();
+                caches.open(CACHE_NAME)
+                    .then(cache => cache.put(request, copy));
+                return response;
+            })
+            .catch(() => caches.match(request))
+    );
+});
