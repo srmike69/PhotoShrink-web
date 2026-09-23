@@ -3506,15 +3506,14 @@ const originalType =
     );
 
 
-const originalExif =
+const originalMetadata =
     preserveMetadata &&
-    preserveMetadata.checked &&
-    originalType ===
-        "image/jpeg"
-        ? await extractExifSegment(
-            originalFile
+    preserveMetadata.checked
+        ? await extractPortableMetadata(
+            originalFile,
+            originalType
         )
-        : null;
+        : [];
 
 
 const result =
@@ -3522,8 +3521,8 @@ const result =
         image,
         originalFile,
         targetBytes,
-        originalExif,
-        originalType
+        originalMetadata,
+        "image/jpeg"
     );
 
 
